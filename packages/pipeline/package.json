@@ -1,0 +1,29 @@
+{
+  "name": "@ai-podcast/pipeline",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.940.0",
+    "@google-cloud/text-to-speech": "^6.4.0",
+    "@hono/node-server": "^1.19.6",
+    "@mozilla/readability": "^0.6.0",
+    "@supabase/supabase-js": "^2.84.0",
+    "dotenv": "^17.2.3",
+    "hono": "^4.10.7",
+    "jsdom": "^27.2.0"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^24.10.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
