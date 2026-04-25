@@ -1,5 +1,5 @@
 {
-  "name": "@ai-podcast/pipeline",
+  "name": "@from-fed-to-chain-mono/pipeline",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,17 +11,23 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "@aws-sdk/client-s3": "^3.940.0",
     "@google-cloud/text-to-speech": "^6.4.0",
+    "@google/generative-ai": "^0.24.1",
     "@hono/node-server": "^1.19.6",
     "@mozilla/readability": "^0.6.0",
     "@supabase/supabase-js": "^2.84.0",
     "dotenv": "^17.2.3",
+    "fluent-ffmpeg": "^2.1.3",
     "hono": "^4.10.7",
-    "jsdom": "^27.2.0"
+    "jsdom": "^27.2.0",
+    "openai": "^6.34.0"
   },
   "devDependencies": {
-    "@types/jsdom": "^27.0.0",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@types/fluent-ffmpeg": "^2.1.27",
+    "@types/jsdom": "^28.0.1",
     "@types/node": "^24.10.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

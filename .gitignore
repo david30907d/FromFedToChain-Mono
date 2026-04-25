@@ -12,3 +12,6 @@ apps/mobile/.packages
 
 # macOS
 .DS_Store
+
+# GCP credential
+service-account.json

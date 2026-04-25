@@ -26,6 +26,8 @@ export function toEpisodeResponse(row: EpisodeRow): EpisodeResponse {
     audioUrl: row.audio_url,
     createdAt: row.created_at,
     listened: row.listened,
+    llmModel: row.llm_model,
+    llmThinkingModel: row.llm_thinking_model,
   };
 }
 
@@ -59,15 +61,17 @@ export async function listEpisodes(): Promise<EpisodeRow[]> {
 
 export async function insertEpisode(episode: NewEpisode): Promise<EpisodeRow> {
   const { data, error } = await getSupabase()
-    .from('episodes')
-    .insert({
-      id: episode.id,
-      title: episode.title,
-      source_url: episode.sourceUrl,
-      audio_url: episode.audioUrl,
-      raw_text: episode.rawText,
-      script: episode.script,
-    })
+  .from('episodes')
+  .insert({
+    id: episode.id,
+    title: episode.title,
+    source_url: episode.sourceUrl,
+    audio_url: episode.audioUrl,
+    raw_text: episode.rawText,
+    script: episode.script,
+    llm_model: episode.llmModel,
+    llm_thinking_model: episode.llmThinkingModel,
+  })
     .select('*')
     .single<EpisodeRow>();
 

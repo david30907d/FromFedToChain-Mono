@@ -1,5 +1,5 @@
 {
-  "name": "ai-podcast",
+  "name": "from-fed-to-chain-mono",
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "engines": {
@@ -9,9 +9,11 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
-    "start": "turbo run start"
+    "start": "turbo run start",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
     "turbo": "^2.6.1"
   }
 }

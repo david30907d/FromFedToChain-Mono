@@ -10,6 +10,8 @@ export interface EpisodeRow {
   audio_url: string;
   raw_text: string | null;
   script: string | null;
+  llm_model: string | null;
+  llm_thinking_model: string | null;
   created_at: string;
   listened: boolean;
 }
@@ -20,6 +22,8 @@ export interface EpisodeResponse {
   audioUrl: string;
   createdAt: string;
   listened: boolean;
+  llmModel: string | null;
+  llmThinkingModel: string | null;
 }
 
 export interface NewEpisode {
@@ -29,4 +33,6 @@ export interface NewEpisode {
   audioUrl: string;
   rawText: string;
   script: string;
+  llmModel: string;
+  llmThinkingModel: string | null;
 }
