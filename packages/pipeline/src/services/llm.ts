@@ -7,6 +7,7 @@ export interface ScriptResult {
   script: string;
   model: string;
   thinkingModel: string | null;
+  provider: string;
 }
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -82,9 +83,11 @@ export async function generateScriptWithLLM(title: string, text: string): Promis
       params.extra_body = extraBody;
     }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const completion = await openai.chat.completions.create(params as any);
+  const completion = await openai.chat.completions.create(params as any) as any;
 
   const script = completion.choices[0]?.message?.content || '';
+  const provider = completion.provider || 'unknown';
+  const actualModel = completion.model || model;
 
-  return { script, model, thinkingModel };
+  return { script, model: actualModel, thinkingModel, provider };
 }

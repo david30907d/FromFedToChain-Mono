@@ -3,6 +3,8 @@ export interface Article {
   text: string;
 }
 
+export type EpisodeStatus = 'pending' | 'scraped' | 'script_generated' | 'audio_generated' | 'completed';
+
 export interface EpisodeRow {
   id: string;
   title: string;
@@ -12,6 +14,8 @@ export interface EpisodeRow {
   script: string | null;
   llm_model: string | null;
   llm_thinking_model: string | null;
+  llm_provider: string | null;
+  status: string;
   created_at: string;
   listened: boolean;
 }
@@ -24,6 +28,8 @@ export interface EpisodeResponse {
   listened: boolean;
   llmModel: string | null;
   llmThinkingModel: string | null;
+  llmProvider: string | null;
+  status: string;
 }
 
 export interface NewEpisode {
@@ -35,4 +41,6 @@ export interface NewEpisode {
   script: string;
   llmModel: string;
   llmThinkingModel: string | null;
+  llmProvider: string;
+  status: string;
 }

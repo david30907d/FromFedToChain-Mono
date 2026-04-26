@@ -1,0 +1,1 @@
+ALTER TABLE episodes ADD COLUMN status TEXT NOT NULL DEFAULT 'pending';

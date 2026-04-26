@@ -9,13 +9,13 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import { getPort } from './lib/env.js';
-import { mkdirSync, writeFileSync } from 'node:fs';
 import {
   findEpisodeBySourceUrl,
   insertEpisode,
   listEpisodes,
   markEpisodeListened,
   toEpisodeResponse,
+  updateEpisodeStatus,
 } from './services/db.js';
 import { generateScript } from './services/generateScript.js';
 import { scrapeArticle } from './services/scrape.js';
@@ -34,39 +34,74 @@ app.post('/ingest', async (c) => {
   const body = await c.req.json().catch(() => null);
   const rawUrl = typeof body?.url === 'string' ? body.url.trim() : '';
   const url = parseInputUrl(rawUrl);
-  const saveOnly = c.req.query('saveOnly') === 'true';
 
   const existing = await findEpisodeBySourceUrl(url);
-  if (existing && !saveOnly) {
+  const status = existing?.status;
+
+  if ((status === 'audio_generated' || status === 'completed') && existing) {
     return c.json(toEpisodeResponse(existing));
   }
 
-  const article = await scrapeArticle(url);
-  const { script, model, thinkingModel } = await generateScript(article);
+  const id = existing?.id || randomUUID();
+  let article: { title: string; text: string };
+  let existingScript: string | null = existing?.script ?? null;
+  let existingModel: string | null = existing?.llm_model ?? null;
+  let existingThinkingModel: string | null = existing?.llm_thinking_model ?? null;
+  let existingProvider: string | null = existing?.llm_provider ?? null;
+  let existingRawText: string | null = existing?.raw_text ?? null;
 
-  if (saveOnly) {
-    const scriptsDir = './scripts';
-    mkdirSync(scriptsDir, { recursive: true });
-    const id = randomUUID();
-    const scriptPath = `${scriptsDir}/${id}.txt`;
-    writeFileSync(scriptPath, script, 'utf8');
-    return c.json({ id, scriptPath, title: article.title, script, model, thinkingModel });
+  if (!existing || status === 'pending') {
+    article = await scrapeArticle(url);
+    existingRawText = article.text;
+    if (!existing) {
+      await insertEpisode({
+        id,
+        title: article.title,
+        sourceUrl: url,
+        audioUrl: '',
+        rawText: article.text,
+        script: '',
+        llmModel: '',
+        llmThinkingModel: null,
+        llmProvider: '',
+        status: 'scraped',
+      });
+    } else {
+      await updateEpisodeStatus(id, 'scraped', {
+        audioUrl: '',
+        script: '',
+      });
+    }
+  } else {
+    article = { title: existing.title, text: existingRawText || '' };
   }
 
-  const id = randomUUID();
-  const audio = await textToSpeech(script);
-  const audioUrl = await uploadToR2(audio, `episodes/${id}.mp3`);
+  if (status === 'scraped' || !status || status === 'pending') {
+    const { script, model, thinkingModel, provider } = await generateScript(article);
+    existingScript = script;
+    existingModel = model;
+    existingThinkingModel = thinkingModel;
+    existingProvider = provider;
+    await updateEpisodeStatus(id, 'script_generated', {
+      script,
+      llmModel: model,
+      llmThinkingModel: thinkingModel,
+      llmProvider: provider,
+    });
+  }
 
-  const episode = await insertEpisode({
-    id,
-    title: article.title,
-    sourceUrl: url,
-    audioUrl,
-    rawText: article.text,
-    script,
-    llmModel: model,
-    llmThinkingModel: thinkingModel,
-  });
+  if (status !== 'audio_generated' && status !== 'completed') {
+    const audio = await textToSpeech(existingScript || '');
+    const audioUrl = await uploadToR2(audio, `episodes/${id}.mp3`);
+    await updateEpisodeStatus(id, 'completed', {
+      audioUrl,
+    });
+  }
+
+  const episode = await findEpisodeBySourceUrl(url);
+  if (!episode) {
+    throw new HTTPException(500, { message: 'Failed to retrieve episode' });
+  }
 
   return c.json(toEpisodeResponse(episode), 201);
 });
