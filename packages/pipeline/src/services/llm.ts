@@ -34,7 +34,7 @@ function getSystemPrompt(): string {
   }
 }
 
-function buildUserMessage(title: string, text: string): string {
+export function buildUserMessage(title: string, text: string): string {
   return `標題：${title}\n\n內容：\n${text}`;
 }
 

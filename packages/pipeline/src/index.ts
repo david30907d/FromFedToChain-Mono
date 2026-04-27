@@ -22,6 +22,20 @@ import { scrapeArticle } from './services/scrape.js';
 import { uploadToR2 } from './services/storage.js';
 import { textToSpeech } from './services/tts.js';
 
+async function step<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    const err = e instanceof Error ? e : new Error(String(e));
+    const wrapped = new Error(`[step:${name}] ${err.message}`, { cause: err });
+    const meta = (err as { $metadata?: unknown }).$metadata;
+    if (meta !== undefined) {
+      (wrapped as { $metadata?: unknown }).$metadata = meta;
+    }
+    throw wrapped;
+  }
+}
+
 const app = new Hono();
 
 app.use('*', cors());
@@ -35,7 +49,7 @@ app.post('/ingest', async (c) => {
   const rawUrl = typeof body?.url === 'string' ? body.url.trim() : '';
   const url = parseInputUrl(rawUrl);
 
-  const existing = await findEpisodeBySourceUrl(url);
+  const existing = await step('findEpisodeBySourceUrl', () => findEpisodeBySourceUrl(url));
   const status = existing?.status;
 
   if ((status === 'audio_generated' || status === 'completed') && existing) {
@@ -51,54 +65,68 @@ app.post('/ingest', async (c) => {
   let existingRawText: string | null = existing?.raw_text ?? null;
 
   if (!existing || status === 'pending') {
-    article = await scrapeArticle(url);
+    article = await step('scrapeArticle', () => scrapeArticle(url));
     existingRawText = article.text;
     if (!existing) {
-      await insertEpisode({
-        id,
-        title: article.title,
-        sourceUrl: url,
-        audioUrl: '',
-        rawText: article.text,
-        script: '',
-        llmModel: '',
-        llmThinkingModel: null,
-        llmProvider: '',
-        status: 'scraped',
-      });
+      await step('insertEpisode', () =>
+        insertEpisode({
+          id,
+          title: article.title,
+          sourceUrl: url,
+          audioUrl: '',
+          rawText: article.text,
+          script: '',
+          llmModel: '',
+          llmThinkingModel: null,
+          llmProvider: '',
+          status: 'scraped',
+        })
+      );
     } else {
-      await updateEpisodeStatus(id, 'scraped', {
-        audioUrl: '',
-        script: '',
-      });
+      await step('updateEpisodeStatus:scraped', () =>
+        updateEpisodeStatus(id, 'scraped', {
+          audioUrl: '',
+          script: '',
+        })
+      );
     }
   } else {
     article = { title: existing.title, text: existingRawText || '' };
   }
 
   if (status === 'scraped' || !status || status === 'pending') {
-    const { script, model, thinkingModel, provider } = await generateScript(article);
+    const { script, model, thinkingModel, provider } = await step('generateScript', () =>
+      generateScript(article)
+    );
     existingScript = script;
     existingModel = model;
     existingThinkingModel = thinkingModel;
     existingProvider = provider;
-    await updateEpisodeStatus(id, 'script_generated', {
-      script,
-      llmModel: model,
-      llmThinkingModel: thinkingModel,
-      llmProvider: provider,
-    });
+    await step('updateEpisodeStatus:script_generated', () =>
+      updateEpisodeStatus(id, 'script_generated', {
+        script,
+        llmModel: model,
+        llmThinkingModel: thinkingModel,
+        llmProvider: provider,
+      })
+    );
   }
 
   if (status !== 'audio_generated' && status !== 'completed') {
-    const audio = await textToSpeech(existingScript || '');
-    const audioUrl = await uploadToR2(audio, `episodes/${id}.mp3`);
-    await updateEpisodeStatus(id, 'completed', {
-      audioUrl,
-    });
+    const audio = await step('textToSpeech', () => textToSpeech(existingScript || ''));
+    const audioUrl = await step('uploadToR2', () =>
+      uploadToR2(audio, `episodes/${id}.mp3`)
+    );
+    await step('updateEpisodeStatus:completed', () =>
+      updateEpisodeStatus(id, 'completed', {
+        audioUrl,
+      })
+    );
   }
 
-  const episode = await findEpisodeBySourceUrl(url);
+  const episode = await step('findEpisodeBySourceUrl:final', () =>
+    findEpisodeBySourceUrl(url)
+  );
   if (!episode) {
     throw new HTTPException(500, { message: 'Failed to retrieve episode' });
   }
@@ -126,8 +154,32 @@ app.onError((error, c) => {
     return error.getResponse();
   }
 
-  console.error(error);
-  return c.json({ error: 'Internal server error' }, 500);
+  const err = error as Error & { $metadata?: unknown; cause?: unknown };
+  console.error('[/ingest] unhandled error:', {
+    name: err.name,
+    message: err.message,
+    stack: err.stack,
+    awsMetadata: err.$metadata,
+    cause: err.cause,
+  });
+
+  const isDev = process.env.NODE_ENV !== 'production';
+  return c.json(
+    {
+      error: 'Internal server error',
+      ...(isDev && {
+        name: err.name,
+        message: err.message,
+        stack: err.stack,
+        awsMetadata: err.$metadata,
+        cause:
+          err.cause instanceof Error
+            ? { name: err.cause.name, message: err.cause.message, stack: err.cause.stack }
+            : err.cause,
+      }),
+    },
+    500
+  );
 });
 
 function parseInputUrl(value: string): string {
