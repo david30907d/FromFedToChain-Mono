@@ -8,7 +8,7 @@ class AudioPlayerService {
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
 
   Future<void> play(Episode episode) async {
-    await _player.setUrl(episode.audioUrl);
+    await _player.setUrl(episode.hlsUrl);
     await _player.play();
   }
 

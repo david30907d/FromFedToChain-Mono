@@ -9,7 +9,7 @@ export interface EpisodeRow {
   id: string;
   title: string;
   source_url: string;
-  audio_url: string;
+  hls_url: string;
   raw_text: string | null;
   script: string | null;
   llm_model: string | null;
@@ -23,7 +23,7 @@ export interface EpisodeRow {
 export interface EpisodeResponse {
   id: string;
   title: string;
-  audioUrl: string;
+  hlsUrl: string;
   createdAt: string;
   listened: boolean;
   llmModel: string | null;
@@ -36,7 +36,7 @@ export interface NewEpisode {
   id: string;
   title: string;
   sourceUrl: string;
-  audioUrl: string;
+  hlsUrl: string;
   rawText: string;
   script: string;
   llmModel: string;

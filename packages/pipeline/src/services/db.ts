@@ -23,7 +23,7 @@ export function toEpisodeResponse(row: EpisodeRow): EpisodeResponse {
   return {
     id: row.id,
     title: row.title,
-    audioUrl: row.audio_url,
+    hlsUrl: row.hls_url,
     createdAt: row.created_at,
     listened: row.listened,
     llmModel: row.llm_model,
@@ -68,7 +68,7 @@ export async function insertEpisode(episode: NewEpisode): Promise<EpisodeRow> {
       id: episode.id,
       title: episode.title,
       source_url: episode.sourceUrl,
-      audio_url: episode.audioUrl,
+      hls_url: episode.hlsUrl,
       raw_text: episode.rawText,
       script: episode.script,
       llm_model: episode.llmModel,
@@ -104,14 +104,14 @@ export async function markEpisodeListened(id: string): Promise<EpisodeRow | null
 export async function updateEpisodeStatus(
   id: string,
   status: string,
-  updates?: Partial<Pick<NewEpisode, 'script' | 'llmModel' | 'llmThinkingModel' | 'llmProvider' | 'audioUrl'>>
+  updates?: Partial<Pick<NewEpisode, 'script' | 'llmModel' | 'llmThinkingModel' | 'llmProvider' | 'hlsUrl'>>
 ): Promise<EpisodeRow | null> {
   const setFields: Record<string, unknown> = { status };
   if (updates?.script) setFields.script = updates.script;
   if (updates?.llmModel) setFields.llm_model = updates.llmModel;
   if (updates?.llmThinkingModel) setFields.llm_thinking_model = updates.llmThinkingModel;
   if (updates?.llmProvider) setFields.llm_provider = updates.llmProvider;
-  if (updates?.audioUrl !== undefined) setFields.audio_url = updates.audioUrl;
+  if (updates?.hlsUrl !== undefined) setFields.hls_url = updates.hlsUrl;
 
   const { data, error } = await getSupabase()
     .from('episodes')

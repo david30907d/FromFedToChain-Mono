@@ -19,7 +19,8 @@ import {
 } from './services/db.js';
 import { generateScript } from './services/generateScript.js';
 import { scrapeArticle } from './services/scrape.js';
-import { uploadToR2 } from './services/storage.js';
+import { uploadHlsToR2 } from './services/storage.js';
+import { generateHls } from './services/hls.js';
 import { textToSpeech } from './services/tts.js';
 
 async function step<T>(name: string, fn: () => Promise<T>): Promise<T> {
@@ -73,7 +74,7 @@ app.post('/ingest', async (c) => {
           id,
           title: article.title,
           sourceUrl: url,
-          audioUrl: '',
+          hlsUrl: '',
           rawText: article.text,
           script: '',
           llmModel: '',
@@ -85,7 +86,7 @@ app.post('/ingest', async (c) => {
     } else {
       await step('updateEpisodeStatus:scraped', () =>
         updateEpisodeStatus(id, 'scraped', {
-          audioUrl: '',
+          hlsUrl: '',
           script: '',
         })
       );
@@ -114,12 +115,11 @@ app.post('/ingest', async (c) => {
 
   if (status !== 'audio_generated' && status !== 'completed') {
     const audio = await step('textToSpeech', () => textToSpeech(existingScript || ''));
-    const audioUrl = await step('uploadToR2', () =>
-      uploadToR2(audio, `episodes/${id}.mp3`)
-    );
+    const { files } = await step('generateHls', () => generateHls(audio));
+    const hlsUrl = await step('uploadHlsToR2', () => uploadHlsToR2(files, id));
     await step('updateEpisodeStatus:completed', () =>
       updateEpisodeStatus(id, 'completed', {
-        audioUrl,
+        hlsUrl,
       })
     );
   }

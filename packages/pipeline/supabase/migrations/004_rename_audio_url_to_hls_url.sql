@@ -1,0 +1,1 @@
+ALTER TABLE episodes RENAME COLUMN audio_url TO hls_url;
