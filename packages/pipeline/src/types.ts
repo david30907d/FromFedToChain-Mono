@@ -15,7 +15,7 @@ export interface EpisodeRow {
   llm_model: string | null;
   llm_thinking_model: string | null;
   llm_provider: string | null;
-  status: string;
+  status: EpisodeStatus;
   created_at: string;
   listened: boolean;
 }
@@ -26,10 +26,11 @@ export interface EpisodeResponse {
   hlsUrl: string;
   createdAt: string;
   listened: boolean;
+  script: string | null;
   llmModel: string | null;
   llmThinkingModel: string | null;
   llmProvider: string | null;
-  status: string;
+  status: EpisodeStatus;
 }
 
 export interface NewEpisode {
@@ -42,5 +43,5 @@ export interface NewEpisode {
   llmModel: string;
   llmThinkingModel: string | null;
   llmProvider: string;
-  status: string;
+  status: EpisodeStatus;
 }

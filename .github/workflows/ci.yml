@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   ts:
-    name: TypeScript (typecheck + build)
+    name: TypeScript (typecheck + build + test)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -36,6 +36,30 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  coverage:
+    name: Test Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test Coverage
+        run: pnpm test:coverage
+
+      - name: Test
+        run: pnpm test
 
   # Flutter (apps/mobile) is intentionally not wired up yet.
   # When ready, add a separate job using subosito/flutter-action with its own cache.

@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getRequiredEnv } from '../lib/env.js';
-import type { EpisodeResponse, EpisodeRow, NewEpisode } from '../types.js';
+import type { EpisodeResponse, EpisodeRow, EpisodeStatus, NewEpisode } from '../types.js';
 
 let client: SupabaseClient | null = null;
 
@@ -26,6 +26,7 @@ export function toEpisodeResponse(row: EpisodeRow): EpisodeResponse {
     hlsUrl: row.hls_url,
     createdAt: row.created_at,
     listened: row.listened,
+    script: row.script,
     llmModel: row.llm_model,
     llmThinkingModel: row.llm_thinking_model,
     llmProvider: row.llm_provider,
@@ -103,7 +104,7 @@ export async function markEpisodeListened(id: string): Promise<EpisodeRow | null
 
 export async function updateEpisodeStatus(
   id: string,
-  status: string,
+  status: EpisodeStatus,
   updates?: Partial<Pick<NewEpisode, 'script' | 'llmModel' | 'llmThinkingModel' | 'llmProvider' | 'hlsUrl'>>
 ): Promise<EpisodeRow | null> {
   const setFields: Record<string, unknown> = { status };

@@ -3,6 +3,8 @@ import { getRequiredEnv, trimTrailingSlash } from "../lib/env.js";
 import type { HlsFile } from "./hls.js";
 
 let client: S3Client | null = null;
+let bucket: string | null = null;
+let publicBase: string | null = null;
 
 function getR2Client(): S3Client {
   client ??= new S3Client({
@@ -18,15 +20,26 @@ function getR2Client(): S3Client {
   return client;
 }
 
+function getBucket(): string {
+  bucket ??= getRequiredEnv("R2_BUCKET_NAME");
+  return bucket;
+}
+
+function getPublicBase(): string {
+  publicBase ??= trimTrailingSlash(getRequiredEnv("R2_PUBLIC_BASE_URL"));
+  return publicBase;
+}
+
 export async function uploadHlsToR2(files: HlsFile[], episodeId: string): Promise<string> {
   const prefix = `episodes/${episodeId}`;
-  const base = trimTrailingSlash(getRequiredEnv("R2_PUBLIC_BASE_URL"));
+  const r2 = getR2Client();
+  const Bucket = getBucket();
 
   await Promise.all(
     files.map(({ name, data, contentType }) =>
-      getR2Client().send(
+      r2.send(
         new PutObjectCommand({
-          Bucket: getRequiredEnv("R2_BUCKET_NAME"),
+          Bucket,
           Key: `${prefix}/${name}`,
           Body: data,
           ContentType: contentType,
@@ -35,5 +48,5 @@ export async function uploadHlsToR2(files: HlsFile[], episodeId: string): Promis
     ),
   );
 
-  return `${base}/${prefix}/playlist.m3u8`;
+  return `${getPublicBase()}/${prefix}/playlist.m3u8`;
 }

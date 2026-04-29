@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 import '../models/episode.dart';
 import '../services/api_service.dart';
 import '../services/audio_player_service.dart';
+import 'episode_detail_screen.dart';
 
 class EpisodesScreen extends StatefulWidget {
   const EpisodesScreen({
@@ -98,6 +99,7 @@ class _EpisodesScreenState extends State<EpisodesScreen> {
       await _audioService.play(episode);
     } catch (error) {
       if (!mounted) return;
+      setState(() => _currentEpisodeId = null);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Playback failed: $error')),
       );
@@ -131,6 +133,7 @@ class _EpisodesScreenState extends State<EpisodesScreen> {
       _isPlaying = state.playing;
       if (state.processingState == ProcessingState.completed) {
         _isPlaying = false;
+        _currentEpisodeId = null;
       }
     });
   }
@@ -196,10 +199,18 @@ class _EpisodesScreenState extends State<EpisodesScreen> {
           final playing = selected && _isPlaying;
 
           return _EpisodeCard(
+            key: ValueKey(episode.id),
             episode: episode,
             isPlaying: playing,
             onPlayPressed: () => _togglePlayback(episode),
             onListenedPressed: () => _markListened(episode),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => EpisodeDetailScreen(episode: episode),
+                ),
+              );
+            },
           );
         },
         separatorBuilder: (context, index) => const SizedBox(height: 8),
@@ -211,41 +222,48 @@ class _EpisodesScreenState extends State<EpisodesScreen> {
 
 class _EpisodeCard extends StatelessWidget {
   const _EpisodeCard({
+    super.key,
     required this.episode,
     required this.isPlaying,
     required this.onPlayPressed,
     required this.onListenedPressed,
+    required this.onTap,
   });
 
   final Episode episode;
   final bool isPlaying;
   final VoidCallback onPlayPressed;
   final VoidCallback onListenedPressed;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
-        leading: IconButton(
-          tooltip: isPlaying ? 'Pause' : 'Play',
-          onPressed: onPlayPressed,
-          icon: Icon(isPlaying ? Icons.pause_circle : Icons.play_circle),
-          iconSize: 36,
-        ),
-        title: Text(
-          episode.title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(_formatDate(episode.createdAt)),
-        trailing: IconButton(
-          tooltip: episode.listened ? 'Listened' : 'Mark listened',
-          onPressed: episode.listened ? null : onListenedPressed,
-          icon: Icon(
-            episode.listened ? Icons.check_circle : Icons.radio_button_unchecked,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: ListTile(
+          contentPadding: const EdgeInsets.fromLTRB(8, 8, 4, 8),
+          leading: IconButton(
+            tooltip: isPlaying ? 'Pause' : 'Play',
+            onPressed: onPlayPressed,
+            icon: Icon(isPlaying ? Icons.pause_circle : Icons.play_circle),
+            iconSize: 36,
+          ),
+          title: Text(
+            episode.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(_formatDate(episode.createdAt)),
+          trailing: IconButton(
+            tooltip: episode.listened ? 'Listened' : 'Mark listened',
+            onPressed: episode.listened ? null : onListenedPressed,
+            icon: Icon(
+              episode.listened ? Icons.check_circle : Icons.radio_button_unchecked,
+            ),
           ),
         ),
       ),

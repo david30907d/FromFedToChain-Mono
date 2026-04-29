@@ -56,34 +56,27 @@ export async function generateScriptWithLLM(title: string, text: string): Promis
   const system = getSystemPrompt();
   const user = buildUserMessage(title, text);
 
-  interface OpenRouterExtraBody {
-    thinking?: {
-      type: 'optimized';
-      model: string;
+  type OpenRouterParams = OpenAI.Chat.ChatCompletionCreateParamsNonStreaming & {
+    extra_body?: {
+      thinking?: { type: 'optimized'; model: string };
     };
-  }
+  };
 
-  const extraBody: OpenRouterExtraBody = {};
-  if (thinkingModel) {
-    extraBody.thinking = {
-      type: 'optimized',
-      model: thinkingModel,
-    };
-  }
+  const params: OpenRouterParams = {
+    model,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    temperature: 0.7,
+    ...(thinkingModel && {
+      extra_body: { thinking: { type: 'optimized', model: thinkingModel } },
+    }),
+  };
 
-  const params: Record<string, unknown> = {
-      model,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      temperature: 0.7,
-    };
-    if (Object.keys(extraBody).length > 0) {
-      params.extra_body = extraBody;
-    }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const completion = await openai.chat.completions.create(params as any) as any;
+  const completion = (await openai.chat.completions.create(params)) as OpenAI.Chat.ChatCompletion & {
+    provider?: string;
+  };
 
   const script = completion.choices[0]?.message?.content || '';
   const provider = completion.provider || 'unknown';

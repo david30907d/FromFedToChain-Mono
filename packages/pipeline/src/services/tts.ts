@@ -2,7 +2,7 @@ import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 import ffmpeg from 'fluent-ffmpeg';
 import { path as ffmpegPath } from '@ffmpeg-installer/ffmpeg';
 import { randomUUID } from 'crypto';
-import { writeFileSync, unlinkSync, existsSync } from 'fs';
+import { writeFileSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -16,28 +16,24 @@ function getClient(): TextToSpeechClient {
 
 const MAX_BYTES = 4800;
 
-function getByteLength(str: string): number {
-  return Buffer.byteLength(str, 'utf8');
-}
-
-function splitTextIntoChunks(text: string, maxBytes: number): string[] {
+export function splitTextIntoChunks(text: string, maxBytes: number): string[] {
   const chunks: string[] = [];
   const sentences = text.split(/(?<=[。！？])/);
   let currentChunk = '';
 
   for (const sentence of sentences) {
     const testChunk = currentChunk + sentence;
-    if (getByteLength(testChunk) <= maxBytes) {
+    if (Buffer.byteLength(testChunk, 'utf8') <= maxBytes) {
       currentChunk = testChunk;
     } else {
       if (currentChunk) {
         chunks.push(currentChunk.trim());
       }
-      if (getByteLength(sentence) > maxBytes) {
+      if (Buffer.byteLength(sentence, 'utf8') > maxBytes) {
         let chars = '';
         for (const char of sentence) {
           const testChar = chars + char;
-          if (getByteLength(testChar) > maxBytes) {
+          if (Buffer.byteLength(testChar, 'utf8') > maxBytes) {
             chunks.push(chars.trim());
             chars = char;
           } else {
@@ -58,7 +54,7 @@ function splitTextIntoChunks(text: string, maxBytes: number): string[] {
   return chunks;
 }
 
-async function synthesizeChunk(text: string): Promise<Buffer> {
+export async function synthesizeChunk(text: string): Promise<Buffer> {
   const languageCode = process.env.GOOGLE_TTS_LANGUAGE_CODE || 'cmn-TW';
   const name = process.env.GOOGLE_TTS_VOICE_NAME || 'cmn-TW-Wavenet-A';
 
@@ -75,7 +71,7 @@ async function synthesizeChunk(text: string): Promise<Buffer> {
   return Buffer.from(response.audioContent as Uint8Array);
 }
 
-async function concatenateAudioChunks(chunks: Buffer[]): Promise<Buffer> {
+export async function concatenateAudioChunks(chunks: Buffer[]): Promise<Buffer> {
   if (chunks.length === 1) {
     return chunks[0];
   }

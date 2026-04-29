@@ -4,9 +4,14 @@ create table if not exists public.episodes (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   source_url text not null unique,
-  audio_url text not null,
+  hls_url text not null default '',
   raw_text text,
   script text,
+  llm_model text,
+  llm_thinking_model text,
+  llm_provider text,
+  status text not null default 'pending'
+    check (status in ('pending', 'scraped', 'script_generated', 'audio_generated', 'completed')),
   created_at timestamptz not null default now(),
   listened boolean not null default false
 );

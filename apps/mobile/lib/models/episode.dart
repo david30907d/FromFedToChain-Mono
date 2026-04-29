@@ -5,6 +5,7 @@ class Episode {
     required this.hlsUrl,
     required this.createdAt,
     required this.listened,
+    this.script,
   });
 
   final String id;
@@ -12,6 +13,7 @@ class Episode {
   final String hlsUrl;
   final DateTime createdAt;
   final bool listened;
+  final String? script;
 
   factory Episode.fromJson(Map<String, dynamic> json) {
     return Episode(
@@ -20,6 +22,7 @@ class Episode {
       hlsUrl: json['hlsUrl'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
       listened: json['listened'] as bool? ?? false,
+      script: json['script'] as String?,
     );
   }
 
@@ -29,6 +32,7 @@ class Episode {
     String? hlsUrl,
     DateTime? createdAt,
     bool? listened,
+    String? script,
   }) {
     return Episode(
       id: id ?? this.id,
@@ -36,6 +40,7 @@ class Episode {
       hlsUrl: hlsUrl ?? this.hlsUrl,
       createdAt: createdAt ?? this.createdAt,
       listened: listened ?? this.listened,
+      script: script ?? this.script,
     );
   }
 }

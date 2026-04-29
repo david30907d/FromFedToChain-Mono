@@ -17,7 +17,8 @@ import {
   toEpisodeResponse,
   updateEpisodeStatus,
 } from './services/db.js';
-import { generateScript } from './services/generateScript.js';
+import type { EpisodeRow } from './types.js';
+import { generateScriptWithLLM } from './services/llm.js';
 import { scrapeArticle } from './services/scrape.js';
 import { uploadHlsToR2 } from './services/storage.js';
 import { generateHls } from './services/hls.js';
@@ -59,17 +60,13 @@ app.post('/ingest', async (c) => {
 
   const id = existing?.id || randomUUID();
   let article: { title: string; text: string };
-  let existingScript: string | null = existing?.script ?? null;
-  let existingModel: string | null = existing?.llm_model ?? null;
-  let existingThinkingModel: string | null = existing?.llm_thinking_model ?? null;
-  let existingProvider: string | null = existing?.llm_provider ?? null;
-  let existingRawText: string | null = existing?.raw_text ?? null;
+  let script: string = existing?.script ?? '';
+  let latest: EpisodeRow | null = existing ?? null;
 
   if (!existing || status === 'pending') {
     article = await step('scrapeArticle', () => scrapeArticle(url));
-    existingRawText = article.text;
     if (!existing) {
-      await step('insertEpisode', () =>
+      latest = await step('insertEpisode', () =>
         insertEpisode({
           id,
           title: article.title,
@@ -84,7 +81,7 @@ app.post('/ingest', async (c) => {
         })
       );
     } else {
-      await step('updateEpisodeStatus:scraped', () =>
+      latest = await step('updateEpisodeStatus:scraped', () =>
         updateEpisodeStatus(id, 'scraped', {
           hlsUrl: '',
           script: '',
@@ -92,46 +89,40 @@ app.post('/ingest', async (c) => {
       );
     }
   } else {
-    article = { title: existing.title, text: existingRawText || '' };
+    article = { title: existing.title, text: existing.raw_text ?? '' };
   }
 
   if (status === 'scraped' || !status || status === 'pending') {
-    const { script, model, thinkingModel, provider } = await step('generateScript', () =>
-      generateScript(article)
+    const generated = await step('generateScript', () =>
+      generateScriptWithLLM(article.title, article.text)
     );
-    existingScript = script;
-    existingModel = model;
-    existingThinkingModel = thinkingModel;
-    existingProvider = provider;
-    await step('updateEpisodeStatus:script_generated', () =>
+    script = generated.script;
+    latest = await step('updateEpisodeStatus:script_generated', () =>
       updateEpisodeStatus(id, 'script_generated', {
-        script,
-        llmModel: model,
-        llmThinkingModel: thinkingModel,
-        llmProvider: provider,
+        script: generated.script,
+        llmModel: generated.model,
+        llmThinkingModel: generated.thinkingModel,
+        llmProvider: generated.provider,
       })
     );
   }
 
   if (status !== 'audio_generated' && status !== 'completed') {
-    const audio = await step('textToSpeech', () => textToSpeech(existingScript || ''));
+    const audio = await step('textToSpeech', () => textToSpeech(script));
     const { files } = await step('generateHls', () => generateHls(audio));
     const hlsUrl = await step('uploadHlsToR2', () => uploadHlsToR2(files, id));
-    await step('updateEpisodeStatus:completed', () =>
+    latest = await step('updateEpisodeStatus:completed', () =>
       updateEpisodeStatus(id, 'completed', {
         hlsUrl,
       })
     );
   }
 
-  const episode = await step('findEpisodeBySourceUrl:final', () =>
-    findEpisodeBySourceUrl(url)
-  );
-  if (!episode) {
+  if (!latest) {
     throw new HTTPException(500, { message: 'Failed to retrieve episode' });
   }
 
-  return c.json(toEpisodeResponse(episode), 201);
+  return c.json(toEpisodeResponse(latest), 201);
 });
 
 app.get('/episodes', async (c) => {
