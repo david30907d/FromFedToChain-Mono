@@ -1,11 +1,8 @@
-import ffmpeg from 'fluent-ffmpeg';
-import { path as ffmpegPath } from '@ffmpeg-installer/ffmpeg';
 import { randomUUID } from 'crypto';
 import { writeFileSync, readFileSync, readdirSync, statSync, unlinkSync, mkdirSync, rmdirSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'node:path';
-
-ffmpeg.setFfmpegPath(ffmpegPath);
+import { ffmpeg } from '../lib/ffmpeg.js';
 
 export interface HlsFile {
   name: string;
@@ -34,6 +31,7 @@ export async function generateHls(mp3Buffer: Buffer): Promise<HlsResult> {
   const inputFile = path.join(tempDir, 'input.mp3');
   const outputName = 'playlist.m3u8';
   const segmentPattern = path.join(tempDir, 'seg%d.ts');
+  let generatedEntries: string[] | null = null;
 
   writeFileSync(inputFile, mp3Buffer);
 
@@ -54,13 +52,19 @@ export async function generateHls(mp3Buffer: Buffer): Promise<HlsResult> {
         .run();
     });
 
-    const files: HlsFile[] = [];
     const entries = readdirSync(tempDir);
+    generatedEntries = entries;
+    const files: HlsFile[] = [];
+    let playlistGenerated = false;
 
     for (const entry of entries) {
       const filePath = path.join(tempDir, entry);
       const stat = statSync(filePath);
       if (!stat.isFile()) continue;
+
+      if (entry === outputName) {
+        playlistGenerated = true;
+      }
 
       const data = readFileSync(filePath);
       files.push({
@@ -74,8 +78,7 @@ export async function generateHls(mp3Buffer: Buffer): Promise<HlsResult> {
       throw new Error('No HLS files were generated');
     }
 
-    const playlistFile = files.find(f => f.name === outputName);
-    if (!playlistFile) {
+    if (!playlistGenerated) {
       throw new Error('Playlist file was not generated');
     }
 
@@ -85,7 +88,7 @@ export async function generateHls(mp3Buffer: Buffer): Promise<HlsResult> {
     };
   } finally {
     try {
-      const entries = readdirSync(tempDir);
+      const entries = generatedEntries ?? readdirSync(tempDir);
       for (const entry of entries) {
         try { unlinkSync(path.join(tempDir, entry)); } catch { /* ignore */ }
       }

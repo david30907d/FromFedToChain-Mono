@@ -1,11 +1,8 @@
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
-import ffmpeg from 'fluent-ffmpeg';
-import { path as ffmpegPath } from '@ffmpeg-installer/ffmpeg';
 import { randomUUID } from 'crypto';
 import { writeFileSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
-
-ffmpeg.setFfmpegPath(ffmpegPath);
+import { ffmpeg } from '../lib/ffmpeg.js';
 
 let client: TextToSpeechClient | null = null;
 

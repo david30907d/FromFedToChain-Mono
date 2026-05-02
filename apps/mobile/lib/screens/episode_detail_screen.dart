@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/episode.dart';
+import '../utils/date_format.dart';
 
 class EpisodeDetailScreen extends StatelessWidget {
   const EpisodeDetailScreen({
@@ -27,7 +28,7 @@ class EpisodeDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              _formatDate(episode.createdAt),
+              formatEpisodeDate(episode.createdAt),
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 24),
@@ -44,13 +45,5 @@ class EpisodeDetailScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  static String _formatDate(DateTime date) {
-    String twoDigits(int value) => value.toString().padLeft(2, '0');
-    return [
-      '${date.year}-${twoDigits(date.month)}-${twoDigits(date.day)}',
-      '${twoDigits(date.hour)}:${twoDigits(date.minute)}',
-    ].join(' ');
   }
 }

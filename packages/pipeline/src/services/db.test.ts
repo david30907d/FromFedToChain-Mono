@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   toEpisodeResponse,
   findEpisodeBySourceUrl,
@@ -318,6 +318,27 @@ describe('updateEpisodeStatus', () => {
   it('updates with hlsUrl field', async () => {
     mockMaybeSingle.mockResolvedValue({ data: { id: '123' }, error: null });
     await updateEpisodeStatus('123', 'completed', { hlsUrl: 'https://cdn.example.com/hls.m3u8' });
+  });
+
+  it('persists explicit empty string updates', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: { id: '123' }, error: null });
+
+    await updateEpisodeStatus('123', 'scraped', {
+      script: '',
+      llmModel: '',
+      llmThinkingModel: '',
+      llmProvider: '',
+      hlsUrl: '',
+    });
+
+    expect(mockUpdate).toHaveBeenLastCalledWith({
+      status: 'scraped',
+      script: '',
+      llm_model: '',
+      llm_thinking_model: '',
+      llm_provider: '',
+      hls_url: '',
+    });
   });
 
   it('returns null when episode not found', async () => {

@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 import '../models/episode.dart';
 import '../services/api_service.dart';
 import '../services/audio_player_service.dart';
+import '../utils/date_format.dart';
 import 'episode_detail_screen.dart';
 
 class EpisodesScreen extends StatefulWidget {
@@ -85,13 +86,8 @@ class _EpisodesScreenState extends State<EpisodesScreen> {
 
   Future<void> _togglePlayback(Episode episode) async {
     try {
-      if (_currentEpisodeId == episode.id && _isPlaying) {
-        await _audioService.pause();
-        return;
-      }
-
       if (_currentEpisodeId == episode.id) {
-        await _audioService.resume();
+        await (_isPlaying ? _audioService.pause() : _audioService.resume());
         return;
       }
 
@@ -257,25 +253,18 @@ class _EpisodeCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          subtitle: Text(_formatDate(episode.createdAt)),
+          subtitle: Text(formatEpisodeDate(episode.createdAt)),
           trailing: IconButton(
             tooltip: episode.listened ? 'Listened' : 'Mark listened',
             onPressed: episode.listened ? null : onListenedPressed,
             icon: Icon(
-              episode.listened ? Icons.check_circle : Icons.radio_button_unchecked,
+              episode.listened
+                  ? Icons.check_circle
+                  : Icons.radio_button_unchecked,
             ),
           ),
         ),
       ),
     );
-  }
-
-  static String _formatDate(DateTime date) {
-    String twoDigits(int value) => value.toString().padLeft(2, '0');
-
-    return [
-      '${date.year}-${twoDigits(date.month)}-${twoDigits(date.day)}',
-      '${twoDigits(date.hour)}:${twoDigits(date.minute)}',
-    ].join(' ');
   }
 }

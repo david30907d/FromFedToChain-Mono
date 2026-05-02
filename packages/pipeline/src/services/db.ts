@@ -108,10 +108,10 @@ export async function updateEpisodeStatus(
   updates?: Partial<Pick<NewEpisode, 'script' | 'llmModel' | 'llmThinkingModel' | 'llmProvider' | 'hlsUrl'>>
 ): Promise<EpisodeRow | null> {
   const setFields: Record<string, unknown> = { status };
-  if (updates?.script) setFields.script = updates.script;
-  if (updates?.llmModel) setFields.llm_model = updates.llmModel;
-  if (updates?.llmThinkingModel) setFields.llm_thinking_model = updates.llmThinkingModel;
-  if (updates?.llmProvider) setFields.llm_provider = updates.llmProvider;
+  if (updates?.script !== undefined) setFields.script = updates.script;
+  if (updates?.llmModel !== undefined) setFields.llm_model = updates.llmModel;
+  if (updates?.llmThinkingModel !== undefined) setFields.llm_thinking_model = updates.llmThinkingModel;
+  if (updates?.llmProvider !== undefined) setFields.llm_provider = updates.llmProvider;
   if (updates?.hlsUrl !== undefined) setFields.hls_url = updates.hlsUrl;
 
   const { data, error } = await getSupabase()
