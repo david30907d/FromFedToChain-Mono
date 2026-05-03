@@ -19,6 +19,11 @@ create table if not exists public.episodes (
 create index if not exists idx_episodes_created_at
   on public.episodes (created_at desc);
 
+-- Composite index for cursor pagination - supports tuple comparison
+-- (created_at, id) used by listEpisodesPaged() in src/services/db.ts.
+create index if not exists idx_episodes_created_at_id
+  on public.episodes (created_at desc, id desc);
+
 alter table public.episodes enable row level security;
 
 do $$

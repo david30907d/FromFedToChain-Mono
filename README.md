@@ -15,10 +15,10 @@ packages/
 
 ```bash
 pnpm install
-cp packages/pipeline/.env.example packages/pipeline/.env
+cp .env.example .env
 ```
 
-Fill `packages/pipeline/.env`, then run the Supabase SQL in
+Fill `.env`, then run the Supabase SQL in
 `packages/pipeline/supabase/schema.sql`.
 
 ## Run
@@ -26,7 +26,7 @@ Fill `packages/pipeline/.env`, then run the Supabase SQL in
 Pipeline:
 
 ```bash
-pnpm dev
+PORT=3010 pnpm --filter @from-fed-to-chain-mono/pipeline dev
 ```
 
 The pipeline API defaults to `http://localhost:3000`.
@@ -36,8 +36,14 @@ Mobile:
 ```bash
 cd apps/mobile
 flutter pub get
-flutter run --dart-define=API_BASE_URL=http://localhost:3000
+open -a Simulator
+flutter devices
+flutter run -d <id: e.g. 1CB5C886-93C2-4950-B95E-FCDCC50C9352> --dart-define=API_BASE_URL=http://localhost:3010
 ```
+
+The mobile app defaults to the production API at
+`https://from-fed-to-chain-api.fly.dev/`. Use `API_BASE_URL` only when pointing
+the app at a local or staging API.
 
 For Android emulator, use:
 
@@ -50,10 +56,12 @@ iOS simulator can usually use `http://localhost:3000`.
 ## API Checks
 
 ```bash
+curl http://localhost:3000/
 curl http://localhost:3000/health
 
 curl -X POST http://localhost:3000/ingest \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $INGEST_ADMIN_TOKEN" \
   -d '{"url":"https://example.com/article"}'
 
 curl http://localhost:3000/episodes
@@ -63,6 +71,50 @@ curl -X POST http://localhost:3000/episodes/<episode-id>/listened
 
 ## Mobile POC
 
-The app reads episodes from the pipeline API, plays each episode's `audioUrl`,
+The app reads episodes from the pipeline API, plays each episode's `hlsUrl`,
 and calls the pipeline API to mark episodes as listened. It does not connect
 directly to Supabase.
+
+## Fly.io Deployment
+
+The production API is configured for Fly at `https://from-fed-to-chain-api.fly.dev`.
+Cloudflare remains the R2 host for generated HLS assets.
+
+```bash
+fly launch --name from-fed-to-chain-api --region nrt --no-deploy
+fly secrets set \
+  NODE_ENV=production \
+  SUPABASE_URL=... \
+  SUPABASE_SERVICE_ROLE_KEY=... \
+  R2_ENDPOINT=... \
+  R2_ACCESS_KEY_ID=... \
+  R2_SECRET_ACCESS_KEY=... \
+  R2_BUCKET_NAME=... \
+  R2_PUBLIC_BASE_URL=... \
+  GOOGLE_APPLICATION_CREDENTIALS_BASE64="$(base64 -i service-account.json)" \
+  OPENROUTER_API_KEY=... \
+  OPENROUTER_BASE_URL=https://openrouter.ai/api/v1 \
+  LLM_MODEL=anthropic/claude-3-5-sonnet-20241022 \
+  INGEST_ADMIN_TOKEN=...
+fly deploy
+```
+
+Smoke checks:
+
+```bash
+curl https://from-fed-to-chain-api.fly.dev/health
+curl https://from-fed-to-chain-api.fly.dev/episodes
+curl -i -X POST https://from-fed-to-chain-api.fly.dev/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/article"}'
+curl -i -X POST https://from-fed-to-chain-api.fly.dev/ingest \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $INGEST_ADMIN_TOKEN" \
+  -d '{"url":"https://example.com/article"}'
+```
+
+Build the mobile app against production with:
+
+```bash
+flutter build ios
+```

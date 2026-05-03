@@ -62,6 +62,65 @@ export async function listEpisodes(): Promise<EpisodeRow[]> {
   return data ?? [];
 }
 
+// ---------------------------------------------------------------------------
+// Cursor pagination
+// ---------------------------------------------------------------------------
+
+export const MAX_LIMIT = 50;
+export const DEFAULT_LIMIT = 20;
+
+export type Cursor = { t: string; i: string };
+
+export function encodeCursor(c: Cursor): string {
+  return Buffer.from(JSON.stringify(c), 'utf8').toString('base64url');
+}
+
+export function decodeCursor(raw: string): Cursor {
+  const obj = JSON.parse(
+    Buffer.from(raw, 'base64url').toString('utf8'),
+  ) as Cursor;
+  if (typeof obj?.t !== 'string' || typeof obj?.i !== 'string') {
+    throw new Error('bad cursor shape');
+  }
+  if (Number.isNaN(Date.parse(obj.t))) throw new Error('bad cursor ts');
+  if (!/^[0-9a-f-]{36}$/i.test(obj.i)) throw new Error('bad cursor id');
+  return obj;
+}
+
+export async function listEpisodesPaged(
+  limit: number,
+  cursor: Cursor | null,
+): Promise<{ rows: EpisodeRow[]; nextCursor: string | null }> {
+  const lim = Math.min(Math.max(limit | 0, 1), MAX_LIMIT);
+
+  let q = getSupabase()
+    .from('episodes')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(lim + 1); // +1 to detect hasMore
+
+  if (cursor) {
+    // PostgREST tuple-comparison: created_at < t  OR  (created_at = t AND id < i)
+    q = q.or(
+      `created_at.lt.${cursor.t},and(created_at.eq.${cursor.t},id.lt.${cursor.i})`,
+    );
+  }
+
+  const { data, error } = await q.returns<EpisodeRow[]>();
+  if (error) throw error;
+
+  const all = data ?? [];
+  const hasMore = all.length > lim;
+  const rows = hasMore ? all.slice(0, lim) : all;
+  const last = hasMore ? rows[rows.length - 1] : null;
+
+  return {
+    rows,
+    nextCursor: last ? encodeCursor({ t: last.created_at, i: last.id }) : null,
+  };
+}
+
 export async function insertEpisode(episode: NewEpisode): Promise<EpisodeRow> {
   const { data, error } = await getSupabase()
     .from('episodes')

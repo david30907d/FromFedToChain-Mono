@@ -4,14 +4,57 @@ import { writeFileSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { ffmpeg } from '../lib/ffmpeg.js';
 
+type TextToSpeechClientOptions = ConstructorParameters<typeof TextToSpeechClient>[0];
+
 let client: TextToSpeechClient | null = null;
 
 function getClient(): TextToSpeechClient {
-  client ??= new TextToSpeechClient();
+  client ??= new TextToSpeechClient(getClientOptions());
   return client;
 }
 
 const MAX_BYTES = 4800;
+
+export function getClientOptions(): TextToSpeechClientOptions | undefined {
+  const rawCredentials = process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64;
+  if (!rawCredentials) {
+    return undefined;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(rawCredentials, 'base64').toString('utf8'));
+  } catch {
+    throw new Error(
+      'Invalid GOOGLE_APPLICATION_CREDENTIALS_BASE64: expected base64-encoded service account JSON'
+    );
+  }
+
+  if (!isServiceAccountCredentials(parsed)) {
+    throw new Error(
+      'Invalid GOOGLE_APPLICATION_CREDENTIALS_BASE64: service account JSON must include client_email, private_key, and project_id'
+    );
+  }
+
+  return {
+    credentials: parsed,
+    projectId: parsed.project_id,
+  };
+}
+
+function isServiceAccountCredentials(value: unknown): value is {
+  client_email: string;
+  private_key: string;
+  project_id: string;
+} {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { client_email?: unknown }).client_email === 'string' &&
+    typeof (value as { private_key?: unknown }).private_key === 'string' &&
+    typeof (value as { project_id?: unknown }).project_id === 'string'
+  );
+}
 
 export function splitTextIntoChunks(text: string, maxBytes: number): string[] {
   const chunks: string[] = [];

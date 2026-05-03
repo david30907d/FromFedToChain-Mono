@@ -4,18 +4,21 @@ import path from 'node:path';
 const envPath = path.resolve(process.cwd(), '../../.env');
 dotenv.config({ path: envPath });
 import { serve } from '@hono/node-server';
-import { randomUUID } from 'node:crypto';
-import { Hono } from 'hono';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import { getPort } from './lib/env.js';
 import {
   findEpisodeBySourceUrl,
   insertEpisode,
-  listEpisodes,
+  listEpisodesPaged,
   markEpisodeListened,
   toEpisodeResponse,
   updateEpisodeStatus,
+  decodeCursor,
+  DEFAULT_LIMIT,
+  type Cursor,
 } from './services/db.js';
 import type { EpisodeRow } from './types.js';
 import { generateScriptWithLLM } from './services/llm.js';
@@ -42,11 +45,16 @@ const app = new Hono();
 
 app.use('*', cors());
 
-app.get('/health', (c) => {
+function healthResponse(c: Context) {
   return c.json({ ok: true });
-});
+}
+
+app.get('/', healthResponse);
+app.get('/health', healthResponse);
 
 app.post('/ingest', async (c) => {
+  requireAdminAuthorization(c.req.header('authorization'));
+
   const body = await c.req.json().catch(() => null);
   const rawUrl = typeof body?.url === 'string' ? body.url.trim() : '';
   const url = parseInputUrl(rawUrl);
@@ -126,8 +134,25 @@ app.post('/ingest', async (c) => {
 });
 
 app.get('/episodes', async (c) => {
-  const episodes = await listEpisodes();
-  return c.json(episodes.map(toEpisodeResponse));
+  const limitRaw = c.req.query('limit');
+  const cursorRaw = c.req.query('cursor');
+
+  const limit = limitRaw === undefined ? DEFAULT_LIMIT : Number(limitRaw);
+  if (!Number.isFinite(limit) || limit < 1) {
+    throw new HTTPException(400, { message: 'invalid limit' });
+  }
+
+  let cursor: Cursor | null = null;
+  if (cursorRaw) {
+    try {
+      cursor = decodeCursor(cursorRaw);
+    } catch {
+      throw new HTTPException(400, { message: 'invalid cursor' });
+    }
+  }
+
+  const { rows, nextCursor } = await listEpisodesPaged(limit, cursor);
+  return c.json({ items: rows.map(toEpisodeResponse), nextCursor });
 });
 
 app.post('/episodes/:id/listened', async (c) => {
@@ -185,6 +210,28 @@ function parseInputUrl(value: string): string {
   } catch {
     throw new HTTPException(400, { message: 'Invalid url' });
   }
+}
+
+function requireAdminAuthorization(authorization: string | undefined): void {
+  const expectedToken = process.env.INGEST_ADMIN_TOKEN;
+  if (!expectedToken) {
+    throw new HTTPException(500, { message: 'INGEST_ADMIN_TOKEN is not configured' });
+  }
+
+  const match = authorization?.match(/^Bearer\s+(.+)$/i);
+  if (!match || !safeTokenEqual(match[1], expectedToken)) {
+    throw new HTTPException(401, { message: 'Unauthorized' });
+  }
+}
+
+function safeTokenEqual(actual: string, expected: string): boolean {
+  const actualBuffer = Buffer.from(actual);
+  const expectedBuffer = Buffer.from(expected);
+
+  return (
+    actualBuffer.length === expectedBuffer.length &&
+    timingSafeEqual(actualBuffer, expectedBuffer)
+  );
 }
 
 const port = getPort();

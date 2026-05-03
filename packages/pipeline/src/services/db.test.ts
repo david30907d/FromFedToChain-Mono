@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   toEpisodeResponse,
+  decodeCursor,
+  encodeCursor,
   findEpisodeBySourceUrl,
   listEpisodes,
+  listEpisodesPaged,
   insertEpisode,
   markEpisodeListened,
   updateEpisodeStatus,
@@ -144,6 +147,37 @@ describe('findEpisodeBySourceUrl', () => {
   });
 });
 
+describe('cursor helpers', () => {
+  it('round-trips a cursor', () => {
+    const cursor = {
+      t: '2024-01-01T00:00:00.000Z',
+      i: '00000000-0000-4000-8000-000000000001',
+    };
+
+    expect(decodeCursor(encodeCursor(cursor))).toEqual(cursor);
+  });
+
+  it('rejects invalid cursor payloads', () => {
+    expect(() => decodeCursor('garbage')).toThrow();
+    expect(() =>
+      decodeCursor(
+        encodeCursor({
+          t: 'not-a-date',
+          i: '00000000-0000-4000-8000-000000000001',
+        })
+      )
+    ).toThrow('bad cursor ts');
+    expect(() =>
+      decodeCursor(
+        encodeCursor({
+          t: '2024-01-01T00:00:00.000Z',
+          i: 'not-a-uuid',
+        })
+      )
+    ).toThrow('bad cursor id');
+  });
+});
+
 describe('listEpisodes', () => {
   it('returns episodes ordered by created_at desc', async () => {
     const episodes: EpisodeRow[] = [
@@ -194,6 +228,68 @@ describe('listEpisodes', () => {
     });
 
     await expect(listEpisodes()).rejects.toThrow('list error');
+  });
+});
+
+describe('listEpisodesPaged', () => {
+  function row(index: number): EpisodeRow {
+    const day = (25 - index).toString().padStart(2, '0');
+    const idSuffix = (index + 1).toString().padStart(12, '0');
+    return {
+      id: `00000000-0000-4000-8000-${idSuffix}`,
+      title: `Episode ${index + 1}`,
+      source_url: `https://example.com/${index + 1}`,
+      hls_url: '',
+      raw_text: null,
+      script: null,
+      llm_model: null,
+      llm_thinking_model: null,
+      llm_provider: null,
+      status: 'completed',
+      created_at: `2024-01-${day}T00:00:00.000Z`,
+      listened: false,
+    };
+  }
+
+  function mockPagedQuery(data: EpisodeRow[]) {
+    const returns = vi.fn().mockResolvedValue({ data, error: null });
+    const or = vi.fn().mockReturnValue({ returns });
+    const limit = vi.fn().mockReturnValue({ returns, or });
+    const secondOrder = vi.fn().mockReturnValue({ limit });
+    const firstOrder = vi.fn().mockReturnValue({ order: secondOrder });
+
+    vi.mocked(mockSelect).mockReturnValue({
+      order: firstOrder,
+      maybeSingle: mockMaybeSingle,
+    });
+
+    return { firstOrder, secondOrder, limit, or, returns };
+  }
+
+  it('returns nextCursor on page 1 and null on the final page', async () => {
+    const seeded = Array.from({ length: 25 }, (_, index) => row(index));
+
+    const page1Query = mockPagedQuery(seeded.slice(0, 21));
+    const page1 = await listEpisodesPaged(20, null);
+
+    expect(page1.rows).toEqual(seeded.slice(0, 20));
+    expect(page1.nextCursor).toBe(
+      encodeCursor({
+        t: seeded[19].created_at,
+        i: seeded[19].id,
+      })
+    );
+    expect(page1Query.limit).toHaveBeenCalledWith(21);
+
+    const cursor = decodeCursor(page1.nextCursor!);
+    const page2Query = mockPagedQuery(seeded.slice(20));
+    const page2 = await listEpisodesPaged(20, cursor);
+
+    expect(page2.rows).toEqual(seeded.slice(20));
+    expect(page2.nextCursor).toBeNull();
+    expect(page2Query.or).toHaveBeenCalledWith(
+      `created_at.lt.${cursor.t},and(created_at.eq.${cursor.t},id.lt.${cursor.i})`
+    );
   });
 });
 

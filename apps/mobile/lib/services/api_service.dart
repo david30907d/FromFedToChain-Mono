@@ -3,12 +3,13 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/episode.dart';
+import '../models/episode_page.dart';
 
 class ApiService {
   ApiService({
     String baseUrl = const String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: 'http://localhost:3000',
+      defaultValue: 'https://from-fed-to-chain-api.fly.dev/',
     ),
     http.Client? client,
   })  : _baseUri = Uri.parse(_withTrailingSlash(baseUrl)),
@@ -17,18 +18,21 @@ class ApiService {
   final Uri _baseUri;
   final http.Client _client;
 
-  Future<List<Episode>> getEpisodes() async {
-    final response = await _client.get(_uri('episodes'));
+  Future<EpisodePage> getEpisodes({int limit = 20, String? cursor}) async {
+    final queryParameters = <String, String>{
+      'limit': '$limit',
+      if (cursor != null) 'cursor': cursor,
+    };
+    final response = await _client.get(
+      _uri('episodes').replace(queryParameters: queryParameters),
+    );
     final data = _decode(response);
 
-    if (data is! List) {
+    if (data is! Map<String, dynamic>) {
       throw const ApiException('Invalid episodes response');
     }
 
-    return data
-        .cast<Map<String, dynamic>>()
-        .map(Episode.fromJson)
-        .toList(growable: false);
+    return EpisodePage.fromJson(data);
   }
 
   Future<Episode> markListened(String id) async {

@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockSynthesize = vi.hoisted(() => vi.fn());
+const { mockSynthesize, mockTextToSpeechClient } = vi.hoisted(() => ({
+  mockSynthesize: vi.fn(),
+  mockTextToSpeechClient: vi.fn(),
+}));
 
 vi.mock('@google-cloud/text-to-speech', () => ({
-  TextToSpeechClient: vi.fn().mockImplementation(() => ({
+  TextToSpeechClient: mockTextToSpeechClient.mockImplementation(() => ({
     synthesizeSpeech: mockSynthesize,
   })),
 }));
@@ -23,7 +26,57 @@ vi.mock('os', () => ({ tmpdir: vi.fn().mockReturnValue('/tmp') }));
 
 vi.mock('crypto', () => ({ randomUUID: vi.fn().mockReturnValue('mock-uuid-456') }));
 
-import { textToSpeech, splitTextIntoChunks, synthesizeChunk, concatenateAudioChunks } from './tts.js';
+import {
+  concatenateAudioChunks,
+  getClientOptions,
+  splitTextIntoChunks,
+  synthesizeChunk,
+  textToSpeech,
+} from './tts.js';
+
+describe('Google credentials', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    mockTextToSpeechClient.mockClear();
+  });
+
+  it('builds TTS client options from base64 service account JSON', () => {
+    const credentials = {
+      client_email: 'tts@example.iam.gserviceaccount.com',
+      private_key: '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n',
+      project_id: 'test-project',
+    };
+    vi.stubEnv(
+      'GOOGLE_APPLICATION_CREDENTIALS_BASE64',
+      Buffer.from(JSON.stringify(credentials), 'utf8').toString('base64')
+    );
+
+    expect(getClientOptions()).toEqual({
+      credentials,
+      projectId: 'test-project',
+    });
+  });
+
+  it('passes base64 service account credentials to the TTS client', async () => {
+    const credentials = {
+      client_email: 'tts@example.iam.gserviceaccount.com',
+      private_key: '-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n',
+      project_id: 'test-project',
+    };
+    vi.stubEnv(
+      'GOOGLE_APPLICATION_CREDENTIALS_BASE64',
+      Buffer.from(JSON.stringify(credentials), 'utf8').toString('base64')
+    );
+    mockSynthesize.mockResolvedValue([{ audioContent: new Uint8Array(1024) }]);
+
+    await synthesizeChunk('Test speech text');
+
+    expect(mockTextToSpeechClient).toHaveBeenCalledWith({
+      credentials,
+      projectId: 'test-project',
+    });
+  });
+});
 
 describe('textToSpeech', () => {
   beforeEach(() => {

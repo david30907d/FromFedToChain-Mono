@@ -9,7 +9,14 @@ the pipeline API instead of connecting directly to Supabase.
 
 ```bash
 flutter pub get
-flutter run --dart-define=API_BASE_URL=http://localhost:3000
+flutter run
+```
+
+The app defaults to `https://from-fed-to-chain-api.fly.dev/`. Override
+`API_BASE_URL` only for local development:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://localhost:3010
 ```
 
 Use `http://10.0.2.2:3000` for Android emulator.
