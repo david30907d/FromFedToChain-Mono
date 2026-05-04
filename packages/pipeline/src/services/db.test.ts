@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createClient } from '@supabase/supabase-js';
 import {
   toEpisodeResponse,
   decodeCursor,
@@ -132,6 +133,13 @@ describe('findEpisodeBySourceUrl', () => {
     mockMaybeSingle.mockResolvedValue({ data: episode, error: null });
 
     const result = await findEpisodeBySourceUrl('https://example.com');
+    expect(createClient).toHaveBeenCalledWith(
+      'https://example.supabase.co',
+      'test-key',
+      expect.objectContaining({
+        db: { schema: 'from_fed_to_chain' },
+      })
+    );
     expect(result).toEqual(episode);
   });
 

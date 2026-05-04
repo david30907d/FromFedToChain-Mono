@@ -11,8 +11,12 @@ pipeline package remains responsible for ingest and audio generation.
 flutter pub get
 flutter run \
   --dart-define=SUPABASE_URL=https://urplxsioxepxopuababf.supabase.co \
-  --dart-define=SUPABASE_ANON_KEY=<anon-key>
+  --dart-define=SUPABASE_ANON_KEY=<anon-key> \
+  --dart-define=SUPABASE_DB_SCHEMA=from_fed_to_chain
 ```
+
+Supabase Data API must expose `from_fed_to_chain`; otherwise the mobile client
+will get schema-cache errors even though the tables exist in SQL.
 
 `API_BASE_URL` is only needed for legacy API-service tests or local experiments:
 

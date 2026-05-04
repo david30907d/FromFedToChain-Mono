@@ -20,6 +20,10 @@ cp .env.example .env
 
 Fill `.env`, then run the Supabase SQL in
 `packages/pipeline/supabase/schema.sql`.
+The app schema defaults to `from_fed_to_chain`; keep `SUPABASE_DB_SCHEMA`
+set to that value unless you intentionally create a separate environment.
+Supabase Data API must also expose `from_fed_to_chain` in API settings, or via
+the `authenticator` role `pgrst.db_schemas` setting.
 
 ## Run
 

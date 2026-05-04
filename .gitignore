@@ -15,3 +15,7 @@ apps/mobile/.packages
 
 # GCP credential
 service-account.json
+
+# Test Coverage
+coverage/
+.nyc_output/

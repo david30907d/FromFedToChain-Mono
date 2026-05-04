@@ -13,6 +13,10 @@ const _supabaseUrl = String.fromEnvironment(
   defaultValue: 'https://urplxsioxepxopuababf.supabase.co',
 );
 const _supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+const _supabaseDbSchema = String.fromEnvironment(
+  'SUPABASE_DB_SCHEMA',
+  defaultValue: 'from_fed_to_chain',
+);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +25,7 @@ Future<void> main() async {
     await Supabase.initialize(
       url: _supabaseUrl,
       anonKey: _supabaseAnonKey,
+      postgrestOptions: PostgrestClientOptions(schema: _supabaseDbSchema),
     );
   }
 

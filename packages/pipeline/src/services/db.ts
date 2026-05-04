@@ -2,13 +2,24 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getRequiredEnv } from '../lib/env.js';
 import type { EpisodeResponse, EpisodeRow, EpisodeStatus, NewEpisode } from '../types.js';
 
-let client: SupabaseClient | null = null;
+type PipelineSupabaseClient = SupabaseClient<any, string, string>;
 
-function getSupabase(): SupabaseClient {
+let client: PipelineSupabaseClient | null = null;
+
+const DEFAULT_SUPABASE_DB_SCHEMA = 'from_fed_to_chain';
+
+function getSupabaseDbSchema(): string {
+  return process.env.SUPABASE_DB_SCHEMA?.trim() || DEFAULT_SUPABASE_DB_SCHEMA;
+}
+
+function getSupabase(): PipelineSupabaseClient {
   client ??= createClient(
     getRequiredEnv('SUPABASE_URL'),
     getRequiredEnv('SUPABASE_SERVICE_ROLE_KEY'),
     {
+      db: {
+        schema: getSupabaseDbSchema(),
+      },
       auth: {
         autoRefreshToken: false,
         persistSession: false,
