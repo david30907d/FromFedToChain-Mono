@@ -37,6 +37,10 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Allow Flutter tools to connect to this app for debugging and profiling.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to sign in instantly</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Microphone access may be requested by audio features used for podcast playback.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

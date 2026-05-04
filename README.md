@@ -39,7 +39,7 @@ Mobile:
 
 See [apps/mobile/README.md](apps/mobile/README.md). The mobile app has its own
 runbook there for command-line launches, Xcode launches, simulator recovery,
-and required `--dart-define` values. Keep mobile launch commands in that file so
+and optional `--dart-define` overrides. Keep mobile launch commands in that file so
 they do not drift between README files.
 
 ## API Checks

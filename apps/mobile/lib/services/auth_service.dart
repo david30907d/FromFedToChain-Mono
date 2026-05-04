@@ -90,7 +90,7 @@ class AuthService {
     final user = await _upsertUser({
       'device_id': deviceId,
       'display_name': _listenerName,
-    }, onConflict: 'device_id');
+    }, onConflict: 'device_id', deviceId: deviceId);
 
     await _persistUser(user);
     return user;
@@ -105,7 +105,7 @@ class AuthService {
     final user = await _upsertUser({
       'email': email,
       'display_name': _listenerName,
-    }, onConflict: 'email');
+    }, onConflict: 'email', email: email);
 
     await _persistUser(user);
     return user;
@@ -121,14 +121,21 @@ class AuthService {
   Future<PodcastUser> _upsertUser(
     Map<String, Object?> values, {
     required String onConflict,
+    String? email,
+    String? deviceId,
   }) async {
     final row = await _supabaseService.client
         .from('users')
         .upsert(values, onConflict: onConflict)
-        .select('id,email,device_id,display_name')
+        .select('id,display_name')
         .single();
 
-    return PodcastUser.fromJson(row);
+    return PodcastUser(
+      id: row['id'] as String,
+      email: email,
+      deviceId: deviceId,
+      displayName: row['display_name'] as String?,
+    );
   }
 
   Future<void> _persistUser(PodcastUser user) async {

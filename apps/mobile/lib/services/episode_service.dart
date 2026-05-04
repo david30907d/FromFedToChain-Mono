@@ -13,7 +13,7 @@ class EpisodeService {
     final end = offset + limit;
     final rows = await _supabaseService.client
         .from('episodes_with_stats')
-        .select()
+        .select('id,title,hls_url,created_at,listened,script,like_count')
         .order('created_at', ascending: false)
         .order('id', ascending: false)
         .range(offset, end);
