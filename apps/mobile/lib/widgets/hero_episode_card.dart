@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/episode.dart';
+import '../screens/episode_detail_screen.dart';
 import '../theme/colors.dart';
 import '../utils/date_format.dart';
 import 'like_button.dart';
@@ -48,76 +49,94 @@ class HeroEpisodeCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -20,
-            top: 22,
-            child: Icon(
-              Icons.graphic_eq_rounded,
-              size: 128,
-              color: AppColors.accent.withValues(alpha: 0.13),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EpisodeDetailScreen(
+                  episode: episode,
+                  onToggleListened: (_) => onToggleListened(),
+                ),
+              ),
+            );
+          },
+          child: Stack(
+            children: [
+              Positioned(
+                right: -20,
+                top: 22,
+                child: Icon(
+                  Icons.graphic_eq_rounded,
+                  size: 128,
+                  color: AppColors.accent.withValues(alpha: 0.13),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        Text(
+                          'LATEST',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppColors.accent,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            formatEpisodeDate(episode.createdAt),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
                     Text(
-                      'LATEST',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      episode.title,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.headlineLarge,
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        formatEpisodeDate(episode.createdAt),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                Text(
-                  episode.title,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.headlineLarge,
-                ),
-                const SizedBox(height: 20),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: onPlay,
-                      icon: Icon(
-                        isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                      ),
-                      label: Text(isPlaying ? 'Pause' : 'Play'),
-                    ),
-                    LikeButton(episode: episode),
-                    ShareButton(episode: episode),
-                    _PlayedButton(
-                      listened: episode.listened,
-                      onPressed: onToggleListened,
+                    const SizedBox(height: 20),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: onPlay,
+                          icon: Icon(
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                          ),
+                          label: Text(isPlaying ? 'Pause' : 'Play'),
+                        ),
+                        LikeButton(episode: episode),
+                        ShareButton(episode: episode),
+                        _PlayedButton(
+                          listened: episode.listened,
+                          onPressed: onToggleListened,
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
