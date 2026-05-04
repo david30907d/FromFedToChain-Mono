@@ -39,7 +39,6 @@ class AuthService {
   static const _userEmailKey = 'podcast_user_email';
   static const _deviceIdKey = 'podcast_device_id';
   static const _displayNameKey = 'podcast_display_name';
-  static const _listenerName = 'From Fed to Chain listener';
 
   final SupabaseService _supabaseService;
   final LocalAuthentication _localAuth;
@@ -87,10 +86,7 @@ class AuthService {
 
     final prefs = await SharedPreferences.getInstance();
     final deviceId = prefs.getString(_deviceIdKey) ?? _newDeviceId();
-    final user = await _upsertUser({
-      'device_id': deviceId,
-      'display_name': _listenerName,
-    }, onConflict: 'device_id', deviceId: deviceId);
+    final user = await _signInUser(deviceId: deviceId);
 
     await _persistUser(user);
     return user;
@@ -102,10 +98,7 @@ class AuthService {
       throw const AuthServiceException('Enter a valid email address.');
     }
 
-    final user = await _upsertUser({
-      'email': email,
-      'display_name': _listenerName,
-    }, onConflict: 'email', email: email);
+    final user = await _signInUser(email: email);
 
     await _persistUser(user);
     return user;
@@ -118,17 +111,17 @@ class AuthService {
     await prefs.remove(_displayNameKey);
   }
 
-  Future<PodcastUser> _upsertUser(
-    Map<String, Object?> values, {
-    required String onConflict,
+  Future<PodcastUser> _signInUser({
     String? email,
     String? deviceId,
   }) async {
-    final row = await _supabaseService.client
-        .from('users')
-        .upsert(values, onConflict: onConflict)
-        .select('id,display_name')
-        .single();
+    final row = await _supabaseService.client.rpc(
+      'sign_in_podcast_user',
+      params: {
+        'p_email': email,
+        'p_device_id': deviceId,
+      },
+    ).single();
 
     return PodcastUser(
       id: row['id'] as String,
