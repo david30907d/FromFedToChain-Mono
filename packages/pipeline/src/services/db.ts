@@ -24,7 +24,7 @@ function getSupabase(): PipelineSupabaseClient {
         autoRefreshToken: false,
         persistSession: false,
       },
-    }
+    },
   );
 
   return client;
@@ -87,9 +87,7 @@ export function encodeCursor(c: Cursor): string {
 }
 
 export function decodeCursor(raw: string): Cursor {
-  const obj = JSON.parse(
-    Buffer.from(raw, 'base64url').toString('utf8'),
-  ) as Cursor;
+  const obj = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')) as Cursor;
   if (typeof obj?.t !== 'string' || typeof obj?.i !== 'string') {
     throw new Error('bad cursor shape');
   }
@@ -113,9 +111,7 @@ export async function listEpisodesPaged(
 
   if (cursor) {
     // PostgREST tuple-comparison: created_at < t  OR  (created_at = t AND id < i)
-    q = q.or(
-      `created_at.lt.${cursor.t},and(created_at.eq.${cursor.t},id.lt.${cursor.i})`,
-    );
+    q = q.or(`created_at.lt.${cursor.t},and(created_at.eq.${cursor.t},id.lt.${cursor.i})`);
   }
 
   const { data, error } = await q.returns<EpisodeRow[]>();
@@ -175,12 +171,15 @@ export async function markEpisodeListened(id: string): Promise<EpisodeRow | null
 export async function updateEpisodeStatus(
   id: string,
   status: EpisodeStatus,
-  updates?: Partial<Pick<NewEpisode, 'script' | 'llmModel' | 'llmThinkingModel' | 'llmProvider' | 'hlsUrl'>>
+  updates?: Partial<
+    Pick<NewEpisode, 'script' | 'llmModel' | 'llmThinkingModel' | 'llmProvider' | 'hlsUrl'>
+  >,
 ): Promise<EpisodeRow | null> {
   const setFields: Record<string, unknown> = { status };
   if (updates?.script !== undefined) setFields.script = updates.script;
   if (updates?.llmModel !== undefined) setFields.llm_model = updates.llmModel;
-  if (updates?.llmThinkingModel !== undefined) setFields.llm_thinking_model = updates.llmThinkingModel;
+  if (updates?.llmThinkingModel !== undefined)
+    setFields.llm_thinking_model = updates.llmThinkingModel;
   if (updates?.llmProvider !== undefined) setFields.llm_provider = updates.llmProvider;
   if (updates?.hlsUrl !== undefined) setFields.hls_url = updates.hlsUrl;
 

@@ -1,2 +1,15 @@
-pnpm typecheck
-pnpm test
+#!/usr/bin/env sh
+# Pre-commit hook: run lint-staged for auto-fixing, then turbo for other checks.
+# Modeled after zapEngine's pre-commit pattern.
+set -eu
+
+# Ensure lockfile is in sync
+pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
+
+# 🎯 Auto-fix and re-stage files that are about to be committed
+pnpm lint-staged
+
+# 🔍 Run the local subset of the CI gate on affected workspaces
+pnpm run check:local
+
+printf '\n✅ Pre-commit passed\n'

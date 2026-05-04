@@ -58,7 +58,7 @@ describe('generateScriptWithLLM', () => {
   it('throws error when OPENROUTER_API_KEY is not set', async () => {
     vi.stubEnv('OPENROUTER_API_KEY', '');
     await expect(generateScriptWithLLM('Title', 'Text')).rejects.toThrow(
-      'OPENROUTER_API_KEY not set'
+      'OPENROUTER_API_KEY not set',
     );
   });
 
@@ -70,13 +70,16 @@ describe('generateScriptWithLLM', () => {
       model: 'mistralai/mistral-7b-instruct-v0.1',
     });
 
-    vi.mocked(OpenAI.default).mockImplementation(() => ({
-      chat: {
-        completions: {
-          create: mockCreate,
-        },
-      },
-    }) as any);
+    vi.mocked(OpenAI.default).mockImplementation(
+      () =>
+        ({
+          chat: {
+            completions: {
+              create: mockCreate,
+            },
+          },
+        }) as any,
+    );
 
     const result = await generateScriptWithLLM('測試標題', '測試內容');
 

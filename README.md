@@ -37,25 +37,10 @@ The pipeline API defaults to `http://localhost:3000`.
 
 Mobile:
 
-```bash
-cd apps/mobile
-flutter pub get
-open -a Simulator
-flutter devices
-flutter run -d <id: e.g. 1CB5C886-93C2-4950-B95E-FCDCC50C9352> --dart-define=API_BASE_URL=http://localhost:3010
-```
-
-The mobile app defaults to the production API at
-`https://from-fed-to-chain-api.fly.dev/`. Use `API_BASE_URL` only when pointing
-the app at a local or staging API.
-
-For Android emulator, use:
-
-```bash
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000
-```
-
-iOS simulator can usually use `http://localhost:3000`.
+See [apps/mobile/README.md](apps/mobile/README.md). The mobile app has its own
+runbook there for command-line launches, Xcode launches, simulator recovery,
+and required `--dart-define` values. Keep mobile launch commands in that file so
+they do not drift between README files.
 
 ## API Checks
 
@@ -73,11 +58,12 @@ curl http://localhost:3000/episodes
 curl -X POST http://localhost:3000/episodes/<episode-id>/listened
 ```
 
-## Mobile POC
+## Mobile App
 
-The app reads episodes from the pipeline API, plays each episode's `hlsUrl`,
-and calls the pipeline API to mark episodes as listened. It does not connect
-directly to Supabase.
+The Flutter app reads episodes, likes, and listened state directly from
+Supabase. The pipeline remains the writer for ingest, script generation, audio,
+and HLS asset publishing. Mobile setup and launch instructions live in
+[apps/mobile/README.md](apps/mobile/README.md).
 
 ## Fly.io Deployment
 
@@ -117,8 +103,5 @@ curl -i -X POST https://from-fed-to-chain-api.fly.dev/ingest \
   -d '{"url":"https://example.com/article"}'
 ```
 
-Build the mobile app against production with:
-
-```bash
-flutter build ios
-```
+Build and run the mobile app from [apps/mobile](apps/mobile); see the mobile
+runbook for the exact command-line and Xcode flows.

@@ -48,7 +48,7 @@ describe('Google credentials', () => {
     };
     vi.stubEnv(
       'GOOGLE_APPLICATION_CREDENTIALS_BASE64',
-      Buffer.from(JSON.stringify(credentials), 'utf8').toString('base64')
+      Buffer.from(JSON.stringify(credentials), 'utf8').toString('base64'),
     );
 
     expect(getClientOptions()).toEqual({
@@ -65,7 +65,7 @@ describe('Google credentials', () => {
     };
     vi.stubEnv(
       'GOOGLE_APPLICATION_CREDENTIALS_BASE64',
-      Buffer.from(JSON.stringify(credentials), 'utf8').toString('base64')
+      Buffer.from(JSON.stringify(credentials), 'utf8').toString('base64'),
     );
     mockSynthesize.mockResolvedValue([{ audioContent: new Uint8Array(1024) }]);
 
@@ -121,8 +121,7 @@ describe('textToSpeech', () => {
   });
 
   it('splits text into multiple chunks when needed', async () => {
-    const longText =
-      '第一章內容。這是第二章內容。這是第三章內容。這是第四章內容。這是第五章內容。';
+    const longText = '第一章內容。這是第二章內容。這是第三章內容。這是第四章內容。這是第五章內容。';
     const result = await textToSpeech(longText);
     expect(result).toBeInstanceOf(Buffer);
     expect(mockSynthesize).toHaveBeenCalled();

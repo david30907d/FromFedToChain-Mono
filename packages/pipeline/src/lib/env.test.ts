@@ -9,17 +9,23 @@ describe('getRequiredEnv', () => {
 
   it('throws when env is missing', () => {
     delete process.env.MISSING_VAR;
-    expect(() => getRequiredEnv('MISSING_VAR')).toThrow('Missing required environment variable: MISSING_VAR');
+    expect(() => getRequiredEnv('MISSING_VAR')).toThrow(
+      'Missing required environment variable: MISSING_VAR',
+    );
   });
 
   it('throws when env is empty string', () => {
     vi.stubEnv('EMPTY_VAR', '');
-    expect(() => getRequiredEnv('EMPTY_VAR')).toThrow('Missing required environment variable: EMPTY_VAR');
+    expect(() => getRequiredEnv('EMPTY_VAR')).toThrow(
+      'Missing required environment variable: EMPTY_VAR',
+    );
   });
 
   it('throws when env is whitespace only', () => {
     vi.stubEnv('WHITESPACE_VAR', '   ');
-    expect(() => getRequiredEnv('WHITESPACE_VAR')).toThrow('Missing required environment variable: WHITESPACE_VAR');
+    expect(() => getRequiredEnv('WHITESPACE_VAR')).toThrow(
+      'Missing required environment variable: WHITESPACE_VAR',
+    );
   });
 
   afterEach(() => {

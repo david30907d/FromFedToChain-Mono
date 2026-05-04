@@ -11,13 +11,7 @@ export default defineConfig({
         branches: 80,
         statements: 80,
       },
-      exclude: [
-        '**/*.test.ts',
-        '**/node_modules/**',
-        '**/dist/**',
-        '**/.git/**',
-        'src/index.ts',
-      ],
+      exclude: ['**/*.test.ts', '**/node_modules/**', '**/dist/**', '**/.git/**', 'src/index.ts'],
     },
   },
 });

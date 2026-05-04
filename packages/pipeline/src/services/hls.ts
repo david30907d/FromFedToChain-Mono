@@ -1,5 +1,13 @@
 import { randomUUID } from 'crypto';
-import { writeFileSync, readFileSync, readdirSync, statSync, unlinkSync, mkdirSync, rmdirSync } from 'fs';
+import {
+  writeFileSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+  mkdirSync,
+  rmdirSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import path from 'node:path';
 import { ffmpeg } from '../lib/ffmpeg.js';
@@ -90,9 +98,19 @@ export async function generateHls(mp3Buffer: Buffer): Promise<HlsResult> {
     try {
       const entries = generatedEntries ?? readdirSync(tempDir);
       for (const entry of entries) {
-        try { unlinkSync(path.join(tempDir, entry)); } catch { /* ignore */ }
+        try {
+          unlinkSync(path.join(tempDir, entry));
+        } catch {
+          /* ignore */
+        }
       }
-      try { rmdirSync(tempDir); } catch { /* ignore */ }
-    } catch { /* ignore cleanup errors */ }
+      try {
+        rmdirSync(tempDir);
+      } catch {
+        /* ignore */
+      }
+    } catch {
+      /* ignore cleanup errors */
+    }
   }
 }

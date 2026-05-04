@@ -21,7 +21,13 @@ vi.mock('../lib/env.js', () => ({
   }),
 }));
 
-const { mockMaybeSingle, mockFrom, mockSelect, mockInsert, mockUpdate } = vi.hoisted(() => {
+const {
+  mockMaybeSingle,
+  mockFrom,
+  mockSelect,
+  mockInsert: _mockInsert,
+  mockUpdate,
+} = vi.hoisted(() => {
   const mockMaybeSingle = vi.fn();
   const mockOrder = vi.fn().mockReturnValue({
     returns: vi.fn().mockResolvedValue({ data: [], error: null }),
@@ -138,7 +144,7 @@ describe('findEpisodeBySourceUrl', () => {
       'test-key',
       expect.objectContaining({
         db: { schema: 'from_fed_to_chain' },
-      })
+      }),
     );
     expect(result).toEqual(episode);
   });
@@ -172,16 +178,16 @@ describe('cursor helpers', () => {
         encodeCursor({
           t: 'not-a-date',
           i: '00000000-0000-4000-8000-000000000001',
-        })
-      )
+        }),
+      ),
     ).toThrow('bad cursor ts');
     expect(() =>
       decodeCursor(
         encodeCursor({
           t: '2024-01-01T00:00:00.000Z',
           i: 'not-a-uuid',
-        })
-      )
+        }),
+      ),
     ).toThrow('bad cursor id');
   });
 });
@@ -285,7 +291,7 @@ describe('listEpisodesPaged', () => {
       encodeCursor({
         t: seeded[19].created_at,
         i: seeded[19].id,
-      })
+      }),
     );
     expect(page1Query.limit).toHaveBeenCalledWith(21);
 
@@ -296,7 +302,7 @@ describe('listEpisodesPaged', () => {
     expect(page2.rows).toEqual(seeded.slice(20));
     expect(page2.nextCursor).toBeNull();
     expect(page2Query.or).toHaveBeenCalledWith(
-      `created_at.lt.${cursor.t},and(created_at.eq.${cursor.t},id.lt.${cursor.i})`
+      `created_at.lt.${cursor.t},and(created_at.eq.${cursor.t},id.lt.${cursor.i})`,
     );
   });
 });
@@ -350,7 +356,7 @@ describe('insertEpisode', () => {
         llmThinkingModel: null,
         llmProvider: '',
         status: 'pending',
-      })
+      }),
     ).rejects.toThrow('insert error');
   });
 });

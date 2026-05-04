@@ -19,3 +19,8 @@ service-account.json
 # Test Coverage
 coverage/
 .nyc_output/
+
+# Lint / Quality
+.eslintcache
+.jscpd-report/
+

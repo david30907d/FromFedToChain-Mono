@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { scrapeArticle } from './scrape.js';
 
 vi.mock('node:fs', async () => {
@@ -14,13 +14,13 @@ describe('scrapeArticle', () => {
 
   it('throws when response is not ok', async () => {
     vi.stubEnv('HTTP_PROXY', '');
-    const mockFetch = vi.fn().mockResolvedValue(
-      new Response('', { status: 404, statusText: 'Not Found' })
-    );
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(new Response('', { status: 404, statusText: 'Not Found' }));
     vi.stubGlobal('fetch', mockFetch);
 
     await expect(scrapeArticle('https://example.com')).rejects.toThrow(
-      'Failed to fetch article: 404 Not Found'
+      'Failed to fetch article: 404 Not Found',
     );
   });
 
@@ -37,9 +37,9 @@ describe('scrapeArticle', () => {
       </html>
     `;
 
-    const mockFetch = vi.fn().mockResolvedValue(
-      new Response(html, { status: 200, statusText: 'OK' })
-    );
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(new Response(html, { status: 200, statusText: 'OK' }));
     vi.stubGlobal('fetch', mockFetch);
 
     const result = await scrapeArticle('https://example.com/article');
@@ -59,9 +59,9 @@ describe('scrapeArticle', () => {
       </html>
     `;
 
-    const mockFetch = vi.fn().mockResolvedValue(
-      new Response(html, { status: 200, statusText: 'OK' })
-    );
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(new Response(html, { status: 200, statusText: 'OK' }));
     vi.stubGlobal('fetch', mockFetch);
 
     const result = await scrapeArticle('https://example.com/no-article-title');
@@ -77,21 +77,19 @@ describe('scrapeArticle', () => {
       </html>
     `;
 
-    const mockFetch = vi.fn().mockResolvedValue(
-      new Response(html, { status: 200, statusText: 'OK' })
-    );
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(new Response(html, { status: 200, statusText: 'OK' }));
     vi.stubGlobal('fetch', mockFetch);
 
     await expect(scrapeArticle('https://example.com/empty')).rejects.toThrow(
-      'No readable article text found'
+      'No readable article text found',
     );
   });
 
   it('sets correct fetch headers', async () => {
     const html = `<html><body><p>Content</p></body></html>`;
-    const mockFetch = vi.fn().mockResolvedValue(
-      new Response(html, { status: 200 })
-    );
+    const mockFetch = vi.fn().mockResolvedValue(new Response(html, { status: 200 }));
     vi.stubGlobal('fetch', mockFetch);
 
     await scrapeArticle('https://example.com/test');

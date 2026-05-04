@@ -1,0 +1,11 @@
+{
+  "name": "@from-fed-to-chain-mono/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "dart analyze .",
+    "format": "dart format .",
+    "format:check": "dart format --set-exit-if-changed .",
+    "dup:check": "npx jscpd lib/ --threshold 5 --formats-exts dart:dart"
+  }
+}

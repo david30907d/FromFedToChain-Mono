@@ -26,13 +26,13 @@ export function getClientOptions(): TextToSpeechClientOptions | undefined {
     parsed = JSON.parse(Buffer.from(rawCredentials, 'base64').toString('utf8'));
   } catch {
     throw new Error(
-      'Invalid GOOGLE_APPLICATION_CREDENTIALS_BASE64: expected base64-encoded service account JSON'
+      'Invalid GOOGLE_APPLICATION_CREDENTIALS_BASE64: expected base64-encoded service account JSON',
     );
   }
 
   if (!isServiceAccountCredentials(parsed)) {
     throw new Error(
-      'Invalid GOOGLE_APPLICATION_CREDENTIALS_BASE64: service account JSON must include client_email, private_key, and project_id'
+      'Invalid GOOGLE_APPLICATION_CREDENTIALS_BASE64: service account JSON must include client_email, private_key, and project_id',
     );
   }
 
@@ -129,7 +129,7 @@ export async function concatenateAudioChunks(chunks: Buffer[]): Promise<Buffer> 
 
     await new Promise<void>((resolve, reject) => {
       let command = ffmpeg();
-      inputFiles.forEach(file => command = command.input(file));
+      inputFiles.forEach((file) => (command = command.input(file)));
       const filterExpr = 'concat=n=' + inputFiles.length + ':v=0:a=1';
       command
         .complexFilter(filterExpr)
@@ -143,9 +143,17 @@ export async function concatenateAudioChunks(chunks: Buffer[]): Promise<Buffer> 
     return result;
   } finally {
     for (const file of inputFiles) {
-      try { unlinkSync(file); } catch { /* ignore */ }
+      try {
+        unlinkSync(file);
+      } catch {
+        /* ignore */
+      }
     }
-    try { unlinkSync(outputFile); } catch { /* ignore */ }
+    try {
+      unlinkSync(outputFile);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -160,6 +168,6 @@ export async function textToSpeech(text: string): Promise<Buffer> {
     return synthesizeChunk(chunks[0]);
   }
 
-  const audioBuffers = await Promise.all(chunks.map(chunk => synthesizeChunk(chunk)));
+  const audioBuffers = await Promise.all(chunks.map((chunk) => synthesizeChunk(chunk)));
   return concatenateAudioChunks(audioBuffers);
 }

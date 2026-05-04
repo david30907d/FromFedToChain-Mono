@@ -3,7 +3,12 @@ export interface Article {
   text: string;
 }
 
-export type EpisodeStatus = 'pending' | 'scraped' | 'script_generated' | 'audio_generated' | 'completed';
+export type EpisodeStatus =
+  | 'pending'
+  | 'scraped'
+  | 'script_generated'
+  | 'audio_generated'
+  | 'completed';
 
 export interface EpisodeRow {
   id: string;

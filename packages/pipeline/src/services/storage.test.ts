@@ -26,7 +26,6 @@ vi.mock('@aws-sdk/client-s3', () => ({
 
 import { uploadHlsToR2 } from './storage.js';
 import type { HlsFile } from './hls.js';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
 
 describe('uploadHlsToR2', () => {
   beforeEach(() => {
@@ -39,7 +38,11 @@ describe('uploadHlsToR2', () => {
 
   it('uploads files with correct URL format', async () => {
     const files: HlsFile[] = [
-      { name: 'playlist.m3u8', data: Buffer.alloc(50), contentType: 'application/vnd.apple.mpegurl' },
+      {
+        name: 'playlist.m3u8',
+        data: Buffer.alloc(50),
+        contentType: 'application/vnd.apple.mpegurl',
+      },
     ];
 
     const result = await uploadHlsToR2(files, 'test-id');

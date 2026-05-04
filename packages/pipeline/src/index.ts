@@ -86,14 +86,14 @@ app.post('/ingest', async (c) => {
           llmThinkingModel: null,
           llmProvider: '',
           status: 'scraped',
-        })
+        }),
       );
     } else {
       latest = await step('updateEpisodeStatus:scraped', () =>
         updateEpisodeStatus(id, 'scraped', {
           hlsUrl: '',
           script: '',
-        })
+        }),
       );
     }
   } else {
@@ -102,7 +102,7 @@ app.post('/ingest', async (c) => {
 
   if (status === 'scraped' || !status || status === 'pending') {
     const generated = await step('generateScript', () =>
-      generateScriptWithLLM(article.title, article.text)
+      generateScriptWithLLM(article.title, article.text),
     );
     script = generated.script;
     latest = await step('updateEpisodeStatus:script_generated', () =>
@@ -111,7 +111,7 @@ app.post('/ingest', async (c) => {
         llmModel: generated.model,
         llmThinkingModel: generated.thinkingModel,
         llmProvider: generated.provider,
-      })
+      }),
     );
   }
 
@@ -122,7 +122,7 @@ app.post('/ingest', async (c) => {
     latest = await step('updateEpisodeStatus:completed', () =>
       updateEpisodeStatus(id, 'completed', {
         hlsUrl,
-      })
+      }),
     );
   }
 
@@ -194,7 +194,7 @@ app.onError((error, c) => {
             : err.cause,
       }),
     },
-    500
+    500,
   );
 });
 
@@ -229,8 +229,7 @@ function safeTokenEqual(actual: string, expected: string): boolean {
   const expectedBuffer = Buffer.from(expected);
 
   return (
-    actualBuffer.length === expectedBuffer.length &&
-    timingSafeEqual(actualBuffer, expectedBuffer)
+    actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer)
   );
 }
 
@@ -243,7 +242,7 @@ serve(
   },
   (info) => {
     console.log(`Pipeline API listening on http://localhost:${info.port}`);
-  }
+  },
 );
 
 export default app;

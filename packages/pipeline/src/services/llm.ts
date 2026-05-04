@@ -29,7 +29,7 @@ function getSystemPrompt(): string {
     return cachedSystemPrompt;
   } catch (err) {
     throw new Error(
-      `Prompt file not found at ${promptPath}. Set SCRIPT_PROMPT_PATH or place the file at <repo-root>/prompts/script-system-prompt.txt. Original error: ${(err as Error).message}`
+      `Prompt file not found at ${promptPath}. Set SCRIPT_PROMPT_PATH or place the file at <repo-root>/prompts/script-system-prompt.txt. Original error: ${(err as Error).message}`,
     );
   }
 }
@@ -74,7 +74,9 @@ export async function generateScriptWithLLM(title: string, text: string): Promis
     }),
   };
 
-  const completion = (await openai.chat.completions.create(params)) as OpenAI.Chat.ChatCompletion & {
+  const completion = (await openai.chat.completions.create(
+    params,
+  )) as OpenAI.Chat.ChatCompletion & {
     provider?: string;
   };
 

@@ -6,8 +6,7 @@ export async function scrapeArticle(url: string): Promise<Article> {
   const response = await fetch(url, {
     headers: {
       accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'user-agent':
-        'Mozilla/5.0 (compatible; AI Podcast POC/0.1; +https://localhost)',
+      'user-agent': 'Mozilla/5.0 (compatible; AI Podcast POC/0.1; +https://localhost)',
     },
   });
 

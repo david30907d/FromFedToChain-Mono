@@ -12,10 +12,27 @@
     "start": "turbo run start",
     "test": "turbo run test",
     "test:coverage": "turbo run test:coverage",
+    "lint": "turbo run lint",
+    "format": "turbo run format",
+    "format:check": "turbo run format:check",
+    "dup:check": "turbo run dup:check",
+    "check:local": "pnpm format:check && turbo run lint typecheck dup:check test --affected",
     "prepare": "husky"
   },
   "devDependencies": {
     "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.3",
     "turbo": "^2.6.1"
+  },
+  "lint-staged": {
+    "packages/pipeline/**/*.ts": [
+      "pnpm --filter @from-fed-to-chain-mono/pipeline exec eslint --fix",
+      "pnpm --filter @from-fed-to-chain-mono/pipeline exec prettier --write"
+    ],
+    "apps/mobile/lib/**/*.dart": [
+      "dart format"
+    ]
   }
 }
+
