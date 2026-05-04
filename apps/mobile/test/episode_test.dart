@@ -10,6 +10,7 @@ void main() {
         'hlsUrl': 'https://cdn.example.com/episodes/uuid-123/playlist.m3u8',
         'createdAt': '2024-01-01T12:00:00.000Z',
         'listened': true,
+        'likeCount': 7,
         'script': 'This is the script content',
       };
 
@@ -17,9 +18,25 @@ void main() {
 
       expect(episode.id, 'uuid-123');
       expect(episode.title, 'Test Episode');
-      expect(episode.hlsUrl, 'https://cdn.example.com/episodes/uuid-123/playlist.m3u8');
+      expect(episode.hlsUrl,
+          'https://cdn.example.com/episodes/uuid-123/playlist.m3u8');
       expect(episode.listened, true);
+      expect(episode.likeCount, 7);
       expect(episode.script, 'This is the script content');
+    });
+
+    test('fromJson maps Supabase snake case fields', () {
+      final episode = Episode.fromJson({
+        'id': 'uuid-999',
+        'title': 'Snake Case Episode',
+        'hls_url': 'https://cdn.example.com/episode.m3u8',
+        'created_at': '2024-01-04T12:00:00.000Z',
+        'like_count': 12,
+      });
+
+      expect(episode.hlsUrl, 'https://cdn.example.com/episode.m3u8');
+      expect(episode.likeCount, 12);
+      expect(episode.listened, false);
     });
 
     test('fromJson handles null script', () {
@@ -58,13 +75,15 @@ void main() {
         hlsUrl: 'https://example.com/hls.m3u8',
         createdAt: DateTime(2024, 1, 1),
         listened: false,
+        likeCount: 1,
         script: 'Original script',
       );
 
-      final updated = original.copyWith(script: 'New script');
+      final updated = original.copyWith(script: 'New script', likeCount: 2);
 
       expect(updated.id, original.id);
       expect(updated.title, original.title);
+      expect(updated.likeCount, 2);
       expect(updated.script, 'New script');
     });
 

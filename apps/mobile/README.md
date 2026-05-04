@@ -1,19 +1,20 @@
 # Mobile POC
 
-Minimal Flutter app for the AI Podcast POC.
+Polished Flutter podcast player for the AI Podcast POC.
 
-The POC currently keeps data access behind `packages/pipeline`; mobile should call
-the pipeline API instead of connecting directly to Supabase.
+The app reads episodes, likes, and listened state directly from Supabase. The
+pipeline package remains responsible for ingest and audio generation.
 
 ## Run
 
 ```bash
 flutter pub get
-flutter run
+flutter run \
+  --dart-define=SUPABASE_URL=https://urplxsioxepxopuababf.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<anon-key>
 ```
 
-The app defaults to `https://from-fed-to-chain-api.fly.dev/`. Override
-`API_BASE_URL` only for local development:
+`API_BASE_URL` is only needed for legacy API-service tests or local experiments:
 
 ```bash
 flutter run --dart-define=API_BASE_URL=http://localhost:3010
