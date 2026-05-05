@@ -1,8 +1,10 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/auth_gate.dart';
+import 'services/audio_player_handler.dart';
 import 'state/auth_provider.dart';
 import 'state/likes_provider.dart';
 import 'state/playback_provider.dart';
@@ -37,17 +39,34 @@ Future<void> main() async {
     );
   }
 
+  final audioHandler = await AudioService.init(
+    builder: () => PodcastAudioHandler(),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.example.aipodcast.audio',
+      androidNotificationChannelName: 'AI Podcast',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+      fastForwardInterval: Duration(seconds: 30),
+      rewindInterval: Duration(seconds: 10),
+    ),
+  );
+
   runApp(
-    AiPodcastApp(supabaseConfigured: _supabaseAnonKey.isNotEmpty),
+    AiPodcastApp(
+      supabaseConfigured: _supabaseAnonKey.isNotEmpty,
+      audioHandler: audioHandler,
+    ),
   );
 }
 
 class AiPodcastApp extends StatelessWidget {
   const AiPodcastApp({
     super.key,
+    required this.audioHandler,
     this.supabaseConfigured = true,
   });
 
+  final PodcastAudioHandler audioHandler;
   final bool supabaseConfigured;
 
   @override
@@ -55,7 +74,7 @@ class AiPodcastApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => PlaybackProvider()),
+        ChangeNotifierProvider(create: (_) => PlaybackProvider(audioHandler)),
         ChangeNotifierProvider(create: (_) => LikesProvider()),
       ],
       child: MaterialApp(

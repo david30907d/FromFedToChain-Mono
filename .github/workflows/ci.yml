@@ -61,5 +61,30 @@ jobs:
       - name: Test
         run: pnpm test
 
-  # Flutter (apps/mobile) is intentionally not wired up yet.
-  # When ready, add a separate job using subosito/flutter-action with its own cache.
+  mobile:
+    name: Flutter Mobile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.6'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Format check
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze
+        run: flutter analyze .
+
+      - name: Test
+        run: flutter test

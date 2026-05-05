@@ -1,17 +1,38 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type Mock } from 'vitest';
+
+interface FfmpegMock {
+  setFfmpegPath: Mock;
+  audioCodec: Mock;
+  audioBitrate: Mock;
+  format: Mock;
+  outputOptions: Mock;
+  output: Mock;
+  on: Mock;
+  run: Mock;
+  mockReturnThis: () => FfmpegMock;
+  [key: string]: Mock | ((...args: unknown[]) => FfmpegMock);
+}
+
+const createFfmpegMock = (): FfmpegMock => ({
+  setFfmpegPath: vi.fn().mockReturnThis(),
+  audioCodec: vi.fn().mockReturnThis(),
+  audioBitrate: vi.fn().mockReturnThis(),
+  format: vi.fn().mockReturnThis(),
+  outputOptions: vi.fn().mockReturnThis(),
+  output: vi.fn().mockReturnThis(),
+  on: vi.fn().mockImplementation((_event: string, cb: () => void) => {
+    setTimeout(cb, 20);
+    return vi.mocked(createFfmpegMock());
+  }),
+  run: vi.fn(),
+  mockReturnThis: function (this: FfmpegMock) {
+    return this;
+  },
+});
 
 vi.mock('fluent-ffmpeg', () => ({
   default: Object.assign(
-    vi.fn().mockImplementation(() => ({
-      setFfmpegPath: vi.fn().mockReturnThis(),
-      audioCodec: vi.fn().mockReturnThis(),
-      audioBitrate: vi.fn().mockReturnThis(),
-      format: vi.fn().mockReturnThis(),
-      outputOptions: vi.fn().mockReturnThis(),
-      output: vi.fn().mockReturnThis(),
-      on: vi.fn().mockReturnThis(),
-      run: vi.fn(),
-    })),
+    vi.fn().mockImplementation(() => createFfmpegMock()),
     { setFfmpegPath: vi.fn() },
   ),
 }));
@@ -51,22 +72,7 @@ describe('generateHls', { timeout: 10000 }, () => {
   it('throws when no files are generated', async () => {
     const { default: ffmpeg } = await import('fluent-ffmpeg');
     const mockFfmpeg = vi.mocked(ffmpeg);
-    mockFfmpeg.mockImplementation(
-      () =>
-        ({
-          setFfmpegPath: vi.fn().mockReturnThis(),
-          audioCodec: vi.fn().mockReturnThis(),
-          audioBitrate: vi.fn().mockReturnThis(),
-          format: vi.fn().mockReturnThis(),
-          outputOptions: vi.fn().mockReturnThis(),
-          output: vi.fn().mockReturnThis(),
-          on: vi.fn().mockImplementation((_event: string, cb: () => void) => {
-            setTimeout(cb, 20);
-            return vi.mocked(mockFfmpeg)();
-          }),
-          run: vi.fn(),
-        }) as any,
-    );
+    mockFfmpeg.mockImplementation(() => createFfmpegMock() as unknown as ReturnType<typeof ffmpeg>);
 
     const { generateHls } = await import('./hls.js');
 
@@ -76,25 +82,12 @@ describe('generateHls', { timeout: 10000 }, () => {
   it('throws when playlist file is not generated', async () => {
     const { default: ffmpeg } = await import('fluent-ffmpeg');
     const mockFfmpeg = vi.mocked(ffmpeg);
-    mockFfmpeg.mockImplementation(
-      () =>
-        ({
-          setFfmpegPath: vi.fn().mockReturnThis(),
-          audioCodec: vi.fn().mockReturnThis(),
-          audioBitrate: vi.fn().mockReturnThis(),
-          format: vi.fn().mockReturnThis(),
-          outputOptions: vi.fn().mockReturnThis(),
-          output: vi.fn().mockReturnThis(),
-          on: vi.fn().mockImplementation((_event: string, cb: () => void) => {
-            setTimeout(cb, 20);
-            return vi.mocked(mockFfmpeg)();
-          }),
-          run: vi.fn(),
-        }) as any,
-    );
+    mockFfmpeg.mockImplementation(() => createFfmpegMock() as unknown as ReturnType<typeof ffmpeg>);
 
     const { readdirSync } = await import('node:fs');
-    vi.mocked(readdirSync).mockReturnValue(['seg1.ts', 'seg2.ts'] as any);
+    vi.mocked(readdirSync).mockReturnValue(['seg1.ts', 'seg2.ts'] as unknown as ReturnType<
+      typeof readdirSync
+    >);
 
     const { generateHls } = await import('./hls.js');
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/episode.dart';
+import '../screens/episode_detail_screen.dart';
 import '../theme/colors.dart';
 import '../utils/date_format.dart';
 import 'like_button.dart';
@@ -26,10 +28,7 @@ class EpisodeCard extends StatefulWidget {
   State<EpisodeCard> createState() => _EpisodeCardState();
 }
 
-class _EpisodeCardState extends State<EpisodeCard>
-    with SingleTickerProviderStateMixin {
-  bool _expanded = false;
-
+class _EpisodeCardState extends State<EpisodeCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -41,130 +40,127 @@ class _EpisodeCardState extends State<EpisodeCard>
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: AnimatedSize(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+          onTap: _openDetail,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _PlayButton(
+                  isPlaying: widget.isPlaying,
+                  isLoading: widget.isLoading,
+                  onPressed: widget.onPlay,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _PlayButton(
-                        isPlaying: widget.isPlaying,
-                        isLoading: widget.isLoading,
-                        onPressed: widget.onPlay,
+                      Text(
+                        widget.episode.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.episode.title,
-                              maxLines: _expanded ? 5 : 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 8,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Text(
-                                  formatEpisodeDate(widget.episode.createdAt),
-                                  style: theme.textTheme.bodySmall,
-                                ),
-                                LikeButton(
-                                  episode: widget.episode,
-                                  compact: true,
-                                ),
-                                ShareButton(
-                                  episode: widget.episode,
-                                  compact: true,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        _expanded
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.keyboard_arrow_down_rounded,
-                        color: AppColors.textSecondary,
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            formatEpisodeDate(widget.episode.createdAt),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          LikeButton(
+                            episode: widget.episode,
+                            compact: true,
+                          ),
+                          ShareButton(
+                            episode: widget.episode,
+                            compact: true,
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  if (_expanded) ...[
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: widget.onToggleListened,
-                            icon: Icon(
-                              widget.episode.listened
-                                  ? Icons.check_circle_rounded
-                                  : Icons.check_circle_outline_rounded,
-                              color: widget.episode.listened
-                                  ? AppColors.success
-                                  : AppColors.textSecondary,
-                            ),
-                            label: Text(
-                              widget.episode.listened
-                                  ? 'Played'
-                                  : 'Mark played',
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: widget.episode.listened
-                                  ? AppColors.success
-                                  : AppColors.textPrimary,
-                              side: BorderSide(
-                                color: widget.episode.listened
-                                    ? AppColors.success
-                                    : AppColors.divider,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        FilledButton.icon(
-                          onPressed: widget.onPlay,
-                          icon: Icon(
-                            widget.isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                          ),
-                          label: Text(widget.isPlaying ? 'Pause' : 'Play'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      widget.episode.script?.trim().isNotEmpty == true
-                          ? widget.episode.script!.trim()
-                          : 'No script available yet.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                        height: 1.45,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'More options',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(
+                    Icons.more_horiz_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                  onPressed: _showMoreOptions,
+                ),
+              ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  void _openDetail() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EpisodeDetailScreen(
+          episode: widget.episode,
+          onToggleListened: (_) => widget.onToggleListened(),
+        ),
+      ),
+    );
+  }
+
+  void _showMoreOptions() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceElevated,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(
+                  widget.episode.listened
+                      ? Icons.check_circle_rounded
+                      : Icons.check_circle_outline_rounded,
+                  color: widget.episode.listened
+                      ? AppColors.success
+                      : AppColors.textSecondary,
+                ),
+                title: Text(
+                  widget.episode.listened ? 'Played' : 'Mark as played',
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  widget.onToggleListened();
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.ios_share_rounded,
+                  color: AppColors.textSecondary,
+                ),
+                title: const Text('Share'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  Share.share(
+                    '${widget.episode.title} - ${widget.episode.hlsUrl}',
+                    subject: widget.episode.title,
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
     );
   }
 }
