@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/episode.dart';
 import '../services/audio_player_handler.dart';
@@ -9,9 +10,12 @@ import '../services/audio_player_handler.dart';
 class PlaybackProvider extends ChangeNotifier {
   PlaybackProvider(this._handler) {
     _listen();
+    _loadSpeed();
   }
 
   final PodcastAudioHandler _handler;
+
+  static const _speedKey = 'playback_speed';
 
   StreamSubscription<PlayerState>? _subscription;
   StreamSubscription<Duration>? _positionSubscription;
@@ -41,6 +45,14 @@ class PlaybackProvider extends ChangeNotifier {
     _positionSubscription = _handler.positionStream.listen(_handlePosition);
     _durationSubscription = _handler.durationStream.listen(_handleDuration);
     _speedSubscription = _handler.speedStream.listen(_handleSpeed);
+  }
+
+  Future<void> _loadSpeed() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getDouble(_speedKey);
+    if (saved != null && saved != _speed) {
+      await _handler.setSpeed(saved);
+    }
   }
 
   void _handleSpeed(double speed) {
@@ -85,8 +97,10 @@ class PlaybackProvider extends ChangeNotifier {
     return _handler.seek(position);
   }
 
-  Future<void> setSpeed(double speed) {
-    return _handler.setSpeed(speed);
+  Future<void> setSpeed(double speed) async {
+    await _handler.setSpeed(speed);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_speedKey, speed);
   }
 
   void _handleState(PlayerState state) {

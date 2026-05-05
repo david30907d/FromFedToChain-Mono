@@ -308,86 +308,128 @@ class _PlaybackControlsState extends State<_PlaybackControls> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: SizedBox(
-        height: 56,
-        child: Row(
-          children: [
-            AnimatedScale(
-              scale: _pressed ? 0.96 : 1,
-              duration: const Duration(milliseconds: 90),
-              curve: Curves.easeOutCubic,
-              child: IconButton.filled(
-                tooltip: isPlaying ? 'Pause' : 'Play',
-                style: IconButton.styleFrom(
-                  fixedSize: const Size.square(52),
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.background,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 56,
+            child: Row(
+              children: [
+                AnimatedScale(
+                  scale: _pressed ? 0.96 : 1,
+                  duration: const Duration(milliseconds: 90),
+                  curve: Curves.easeOutCubic,
+                  child: IconButton.filled(
+                    tooltip: isPlaying ? 'Pause' : 'Play',
+                    style: IconButton.styleFrom(
+                      fixedSize: const Size.square(52),
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: AppColors.background,
+                    ),
+                    onPressed: isLoading ? null : _togglePlayback,
+                    icon: isLoading
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.background,
+                            ),
+                          )
+                        : Icon(
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            size: 28,
+                          ),
+                  ),
                 ),
-                onPressed: isLoading ? null : _togglePlayback,
-                icon: isLoading
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.background,
-                        ),
-                      )
-                    : Icon(
-                        isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                        size: 28,
+                const SizedBox(width: 12),
+                Text(
+                  _formatDuration(displayedPosition),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textPrimary,
                       ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              _formatDuration(displayedPosition),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: AppColors.accent,
-                  inactiveTrackColor: AppColors.divider,
-                  thumbColor: AppColors.accent,
-                  overlayColor: AppColors.accent.withValues(alpha: 0.16),
-                  trackHeight: 4,
-                  thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 6,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: AppColors.accent,
+                      inactiveTrackColor: AppColors.divider,
+                      thumbColor: AppColors.accent,
+                      overlayColor: AppColors.accent.withValues(alpha: 0.16),
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 6,
+                      ),
+                    ),
+                    child: Slider(
+                      value: sliderValue,
+                      min: 0,
+                      max: maxValue,
+                      onChangeStart: durationMs > 0 && isCurrent
+                          ? (value) => setState(() => _scrubValue = value)
+                          : null,
+                      onChanged: durationMs > 0 && isCurrent
+                          ? (value) => setState(() => _scrubValue = value)
+                          : null,
+                      onChangeEnd: durationMs > 0 && isCurrent
+                          ? (value) async {
+                              setState(() => _scrubValue = null);
+                              await context.read<PlaybackProvider>().seek(
+                                    Duration(milliseconds: value.round()),
+                                  );
+                            }
+                          : null,
+                    ),
                   ),
                 ),
-                child: Slider(
-                  value: sliderValue,
-                  min: 0,
-                  max: maxValue,
-                  onChangeStart: durationMs > 0 && isCurrent
-                      ? (value) => setState(() => _scrubValue = value)
-                      : null,
-                  onChanged: durationMs > 0 && isCurrent
-                      ? (value) => setState(() => _scrubValue = value)
-                      : null,
-                  onChangeEnd: durationMs > 0 && isCurrent
-                      ? (value) async {
-                          setState(() => _scrubValue = null);
-                          await context.read<PlaybackProvider>().seek(
-                                Duration(milliseconds: value.round()),
-                              );
-                        }
-                      : null,
+                const SizedBox(width: 8),
+                Text(
+                  _formatDuration(duration),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: PopupMenuButton<double>(
+              tooltip: 'Playback speed',
+              initialValue: playback.speed,
+              onSelected: playback.setSpeed,
+              itemBuilder: (context) => [
+                for (final s in [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0])
+                  PopupMenuItem(value: s, child: Text('${s}x')),
+              ],
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.speed_rounded,
+                        size: 16, color: AppColors.accent),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${playback.speed}x',
+                      style: const TextStyle(
+                        color: AppColors.accent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              _formatDuration(duration),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
