@@ -4,13 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../models/episode.dart';
-import '../services/audio_player_service.dart';
+import '../services/audio_player_handler.dart';
 
 class PlaybackProvider extends ChangeNotifier {
-  PlaybackProvider({AudioPlayerService? audioService})
-      : _audioService = audioService ?? AudioPlayerService();
+  PlaybackProvider(this._handler) {
+    _listen();
+  }
 
-  final AudioPlayerService _audioService;
+  final PodcastAudioHandler _handler;
 
   StreamSubscription<PlayerState>? _subscription;
   StreamSubscription<Duration>? _positionSubscription;
@@ -21,7 +22,6 @@ class PlaybackProvider extends ChangeNotifier {
   String? _loadingEpisodeId;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
-  bool _isInitialized = false;
 
   Episode? get currentEpisode => _currentEpisode;
   bool get isPlaying => _isPlaying;
@@ -33,23 +33,18 @@ class PlaybackProvider extends ChangeNotifier {
     return _currentEpisode?.id == id && _isPlaying;
   }
 
-  void _ensureListening() {
-    if (_isInitialized) return;
-
-    _subscription = _audioService.playerStateStream?.listen(_handleState);
-    _positionSubscription =
-        _audioService.positionStream?.listen(_handlePosition);
-    _durationSubscription =
-        _audioService.durationStream?.listen(_handleDuration);
-    _isInitialized = true;
+  void _listen() {
+    _subscription = _handler.playerStateStream.listen(_handleState);
+    _positionSubscription = _handler.positionStream.listen(_handlePosition);
+    _durationSubscription = _handler.durationStream.listen(_handleDuration);
   }
 
   Future<void> toggle(Episode episode) async {
     if (_currentEpisode?.id == episode.id) {
       if (_isPlaying) {
-        await _audioService.pause();
+        await _handler.pause();
       } else {
-        await _audioService.resume();
+        await _handler.play();
       }
       return;
     }
@@ -61,8 +56,8 @@ class PlaybackProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _audioService.play(episode);
-      _ensureListening();
+      await _handler.setEpisode(episode);
+      await _handler.play();
     } finally {
       _loadingEpisodeId = null;
       notifyListeners();
@@ -70,15 +65,15 @@ class PlaybackProvider extends ChangeNotifier {
   }
 
   Future<void> pause() {
-    return _audioService.pause();
+    return _handler.pause();
   }
 
   Future<void> resume() {
-    return _audioService.resume();
+    return _handler.play();
   }
 
   Future<void> seek(Duration position) {
-    return _audioService.seek(position);
+    return _handler.seek(position);
   }
 
   void _handleState(PlayerState state) {
@@ -107,7 +102,7 @@ class PlaybackProvider extends ChangeNotifier {
     _subscription?.cancel();
     _positionSubscription?.cancel();
     _durationSubscription?.cancel();
-    _audioService.dispose();
+    unawaited(_handler.dispose());
     super.dispose();
   }
 }

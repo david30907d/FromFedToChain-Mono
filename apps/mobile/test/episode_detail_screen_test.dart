@@ -11,6 +11,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'fakes/fake_podcast_audio_handler.dart';
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -68,7 +70,9 @@ Future<void> _pumpHarness(WidgetTester tester, Widget child) async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => PlaybackProvider()),
+        ChangeNotifierProvider(
+          create: (_) => PlaybackProvider(FakePodcastAudioHandler()),
+        ),
         ChangeNotifierProvider(create: (_) => LikesProvider()),
       ],
       child: MaterialApp(
