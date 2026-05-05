@@ -2,7 +2,14 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getRequiredEnv } from '../lib/env.js';
 import type { EpisodeResponse, EpisodeRow, EpisodeStatus, NewEpisode } from '../types.js';
 
-type PipelineSupabaseClient = SupabaseClient<any, string, string>;
+type PipelineSupabaseClient = SupabaseClient<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  any
+>;
 
 let client: PipelineSupabaseClient | null = null;
 

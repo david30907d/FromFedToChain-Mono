@@ -1,5 +1,16 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import OpenAI from 'openai';
 import { buildUserMessage, generateScriptWithLLM } from './llm.js';
+
+const createMockOpenAI = (createMock: Mock): unknown => {
+  return {
+    chat: {
+      completions: {
+        create: createMock,
+      },
+    },
+  };
+};
 
 vi.mock('node:fs', async () => {
   const actual = (await vi.importActual('node:fs')) as typeof import('node:fs');
@@ -71,14 +82,7 @@ describe('generateScriptWithLLM', () => {
     });
 
     vi.mocked(OpenAI.default).mockImplementation(
-      () =>
-        ({
-          chat: {
-            completions: {
-              create: mockCreate,
-            },
-          },
-        }) as any,
+      () => createMockOpenAI(mockCreate) as unknown as OpenAI,
     );
 
     const result = await generateScriptWithLLM('測試標題', '測試內容');
@@ -99,22 +103,16 @@ describe('generateScriptWithLLM', () => {
       model: 'test/model',
     });
 
-    const mockInstance = {
-      chat: {
-        completions: {
-          create: mockCreate,
-        },
-      },
-    };
-
-    vi.mocked(OpenAI.default).mockImplementation(() => mockInstance as any);
+    vi.mocked(OpenAI.default).mockImplementation(
+      () => createMockOpenAI(mockCreate) as unknown as OpenAI,
+    );
 
     await generateScriptWithLLM('Title', 'Text');
 
     expect(mockCreate).toHaveBeenCalled();
-    const callArgs = mockCreate.mock.calls[0][0] as any;
+    const callArgs = mockCreate.mock.calls[0][0] as { extra_body?: { thinking?: object } };
     expect(callArgs.extra_body).toBeDefined();
-    expect(callArgs.extra_body.thinking).toEqual({
+    expect(callArgs.extra_body?.thinking).toEqual({
       type: 'optimized',
       model: 'anthropic/claude-3-opus',
     });
@@ -128,15 +126,9 @@ describe('generateScriptWithLLM', () => {
       model: 'test/model',
     });
 
-    const mockInstance = {
-      chat: {
-        completions: {
-          create: mockCreate,
-        },
-      },
-    };
-
-    vi.mocked(OpenAI.default).mockImplementation(() => mockInstance as any);
+    vi.mocked(OpenAI.default).mockImplementation(
+      () => createMockOpenAI(mockCreate) as unknown as OpenAI,
+    );
 
     const result = await generateScriptWithLLM('Title', 'Text');
 
@@ -151,15 +143,9 @@ describe('generateScriptWithLLM', () => {
       model: 'test/model',
     });
 
-    const mockInstance = {
-      chat: {
-        completions: {
-          create: mockCreate,
-        },
-      },
-    };
-
-    vi.mocked(OpenAI.default).mockImplementation(() => mockInstance as any);
+    vi.mocked(OpenAI.default).mockImplementation(
+      () => createMockOpenAI(mockCreate) as unknown as OpenAI,
+    );
 
     const result = await generateScriptWithLLM('Title', 'Text');
 
@@ -176,15 +162,9 @@ describe('generateScriptWithLLM', () => {
       model: null,
     });
 
-    const mockInstance = {
-      chat: {
-        completions: {
-          create: mockCreate,
-        },
-      },
-    };
-
-    vi.mocked(OpenAI.default).mockImplementation(() => mockInstance as any);
+    vi.mocked(OpenAI.default).mockImplementation(
+      () => createMockOpenAI(mockCreate) as unknown as OpenAI,
+    );
 
     const result = await generateScriptWithLLM('Title', 'Text');
 

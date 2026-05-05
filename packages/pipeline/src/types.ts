@@ -3,6 +3,20 @@ export interface Article {
   text: string;
 }
 
+export interface Database {
+  public: DatabasePublic;
+}
+
+export interface DatabasePublic {
+  Tables: {
+    episodes: {
+      Row: EpisodeRow;
+      Insert: Omit<NewEpisode, 'id'> & { id?: string };
+      Update: Partial<NewEpisode>;
+    };
+  };
+}
+
 export type EpisodeStatus =
   | 'pending'
   | 'scraped'

@@ -35,6 +35,12 @@
 	<string>Use Face ID to sign in instantly</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Microphone access may be requested by audio features used for podcast playback.</string>
+	<key>AVAudioSessionCategory</key>
+	<string>AVAudioSessionCategoryPlayback</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
