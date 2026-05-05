@@ -44,6 +44,44 @@ void main() {
     expect(find.text('Full transcript body.'), findsOneWidget);
   });
 
+  testWidgets(
+      'detail screen exposes a speed selector that updates playback speed',
+      (tester) async {
+    final episode = _episode();
+    final handler = FakePodcastAudioHandler();
+    final provider = PlaybackProvider(handler);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AuthProvider()),
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider(create: (_) => LikesProvider()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: EpisodeDetailScreen(episode: episode),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Playback speed'), findsOneWidget,
+        reason: 'speed control must live on the detail screen');
+    expect(find.text('1.0x'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Playback speed'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('1.5x').last);
+    await tester.pumpAndSettle();
+
+    expect(handler.speed, 1.5);
+    expect(find.text('1.5x'), findsOneWidget);
+
+    provider.dispose();
+    await handler.dispose();
+  });
+
   testWidgets('HeroEpisodeCard opens the detail screen', (tester) async {
     final episode = _episode(title: 'Latest macro cycle');
 

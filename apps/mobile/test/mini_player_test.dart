@@ -1,50 +1,111 @@
 import 'package:ai_podcast_mobile/models/episode.dart';
+import 'package:ai_podcast_mobile/screens/episode_detail_screen.dart';
+import 'package:ai_podcast_mobile/state/auth_provider.dart';
+import 'package:ai_podcast_mobile/state/likes_provider.dart';
 import 'package:ai_podcast_mobile/state/playback_provider.dart';
 import 'package:ai_podcast_mobile/theme/app_theme.dart';
 import 'package:ai_podcast_mobile/widgets/mini_player.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fakes/fake_podcast_audio_handler.dart';
 
 void main() {
-  testWidgets('speed menu updates playback speed through the provider',
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets('mini player no longer renders a playback-speed control',
       (tester) async {
-    final handler = FakePodcastAudioHandler();
-    final provider = PlaybackProvider(handler);
-    final episode = Episode(
-      id: 'episode-1',
-      title: 'Test episode',
-      hlsUrl: 'https://example.com/audio.m3u8',
-      createdAt: DateTime(2026),
-      listened: false,
-    );
+    final harness = await _pumpMiniPlayer(tester);
 
-    await provider.toggle(episode);
+    expect(find.text('1.0x'), findsNothing,
+        reason: 'speed chip must live only on the episode detail screen');
+    expect(find.byTooltip('Playback speed'), findsNothing);
 
-    await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: provider,
-        child: MaterialApp(
-          theme: AppTheme.dark(),
-          home: const Scaffold(body: MiniPlayer()),
-        ),
-      ),
-    );
+    await harness.dispose();
+  });
+
+  testWidgets('tapping the mini player bar opens the episode detail screen',
+      (tester) async {
+    final harness = await _pumpMiniPlayer(tester);
+
+    expect(find.byType(EpisodeDetailScreen), findsNothing);
+
+    // Tap the title area (not the play button) so we exercise the
+    // outer GestureDetector, not the IconButton inside it.
+    await tester.tap(find.text('Test episode'));
     await tester.pumpAndSettle();
 
-    expect(find.text('1.0x'), findsOneWidget);
+    expect(find.byType(EpisodeDetailScreen), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Playback speed'));
+    await harness.dispose();
+  });
+
+  testWidgets(
+      'tapping the play button toggles playback and does not navigate away',
+      (tester) async {
+    final harness = await _pumpMiniPlayer(tester);
+
+    expect(harness.handler.pauseCount, 0);
+
+    await tester.tap(find.byTooltip('Pause'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('1.5x').last);
-    await tester.pumpAndSettle();
 
-    expect(handler.speed, 1.5);
-    expect(find.text('1.5x'), findsOneWidget);
+    expect(harness.handler.pauseCount, 1,
+        reason: 'play/pause button must still work independently');
+    expect(find.byType(EpisodeDetailScreen), findsNothing,
+        reason: 'tapping the inner button must not bubble to the bar onTap');
 
+    await harness.dispose();
+  });
+}
+
+class _Harness {
+  _Harness(this.handler, this.provider);
+  final FakePodcastAudioHandler handler;
+  final PlaybackProvider provider;
+
+  Future<void> dispose() async {
     provider.dispose();
     await handler.dispose();
-  });
+  }
+}
+
+Future<_Harness> _pumpMiniPlayer(WidgetTester tester) async {
+  final handler = FakePodcastAudioHandler();
+  final provider = PlaybackProvider(handler);
+  final episode = Episode(
+    id: 'episode-1',
+    title: 'Test episode',
+    hlsUrl: 'https://example.com/audio.m3u8',
+    createdAt: DateTime(2026, 5, 4),
+    listened: false,
+  );
+
+  await provider.toggle(episode);
+
+  await tester.pumpWidget(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider.value(value: provider),
+        ChangeNotifierProvider(create: (_) => LikesProvider()),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home: const Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: MiniPlayer(),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+
+  return _Harness(handler, provider);
 }
