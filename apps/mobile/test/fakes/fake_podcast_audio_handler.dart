@@ -12,10 +12,12 @@ class FakePodcastAudioHandler extends BaseAudioHandler
       StreamController<PlayerState>.broadcast(sync: true);
   final _positionController = StreamController<Duration>.broadcast(sync: true);
   final _durationController = StreamController<Duration?>.broadcast(sync: true);
+  final _speedController = StreamController<double>.broadcast(sync: true);
 
   final List<String> loadedEpisodeIds = [];
   int playCount = 0;
   int pauseCount = 0;
+  double _speed = 1.0;
   bool _closed = false;
 
   @override
@@ -28,7 +30,13 @@ class FakePodcastAudioHandler extends BaseAudioHandler
   Stream<Duration?> get durationStream => _durationController.stream;
 
   @override
+  Stream<double> get speedStream => _speedController.stream;
+
+  @override
   Duration get duration => Duration.zero;
+
+  @override
+  double get speed => _speed;
 
   @override
   Future<void> setEpisode(Episode episode) async {
@@ -52,11 +60,18 @@ class FakePodcastAudioHandler extends BaseAudioHandler
   }
 
   @override
+  Future<void> setSpeed(double speed) async {
+    _speed = speed;
+    _speedController.add(speed);
+  }
+
+  @override
   Future<void> dispose() async {
     if (_closed) return;
     _closed = true;
     await _playerStateController.close();
     await _positionController.close();
     await _durationController.close();
+    await _speedController.close();
   }
 }

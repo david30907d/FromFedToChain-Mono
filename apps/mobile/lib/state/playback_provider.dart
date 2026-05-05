@@ -16,18 +16,21 @@ class PlaybackProvider extends ChangeNotifier {
   StreamSubscription<PlayerState>? _subscription;
   StreamSubscription<Duration>? _positionSubscription;
   StreamSubscription<Duration?>? _durationSubscription;
+  StreamSubscription<double>? _speedSubscription;
 
   Episode? _currentEpisode;
   bool _isPlaying = false;
   String? _loadingEpisodeId;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  double _speed = 1.0;
 
   Episode? get currentEpisode => _currentEpisode;
   bool get isPlaying => _isPlaying;
   String? get loadingEpisodeId => _loadingEpisodeId;
   Duration get position => _position;
   Duration get duration => _duration;
+  double get speed => _speed;
 
   bool isEpisodePlaying(String id) {
     return _currentEpisode?.id == id && _isPlaying;
@@ -37,6 +40,12 @@ class PlaybackProvider extends ChangeNotifier {
     _subscription = _handler.playerStateStream.listen(_handleState);
     _positionSubscription = _handler.positionStream.listen(_handlePosition);
     _durationSubscription = _handler.durationStream.listen(_handleDuration);
+    _speedSubscription = _handler.speedStream.listen(_handleSpeed);
+  }
+
+  void _handleSpeed(double speed) {
+    _speed = speed;
+    notifyListeners();
   }
 
   Future<void> toggle(Episode episode) async {
@@ -76,6 +85,10 @@ class PlaybackProvider extends ChangeNotifier {
     return _handler.seek(position);
   }
 
+  Future<void> setSpeed(double speed) {
+    return _handler.setSpeed(speed);
+  }
+
   void _handleState(PlayerState state) {
     _isPlaying = state.playing;
     if (state.processingState == ProcessingState.completed) {
@@ -102,6 +115,7 @@ class PlaybackProvider extends ChangeNotifier {
     _subscription?.cancel();
     _positionSubscription?.cancel();
     _durationSubscription?.cancel();
+    _speedSubscription?.cancel();
     unawaited(_handler.dispose());
     super.dispose();
   }

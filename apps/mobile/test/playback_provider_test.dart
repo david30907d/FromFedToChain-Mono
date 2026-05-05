@@ -40,6 +40,20 @@ void main() {
     provider.dispose();
     await handler.dispose();
   });
+
+  test('setSpeed delegates to the handler and tracks speed stream updates',
+      () async {
+    final handler = FakePodcastAudioHandler();
+    final provider = PlaybackProvider(handler);
+
+    await provider.setSpeed(1.5);
+
+    expect(handler.speed, 1.5);
+    expect(provider.speed, 1.5);
+
+    provider.dispose();
+    await handler.dispose();
+  });
 }
 
 Episode _episode(String id) {

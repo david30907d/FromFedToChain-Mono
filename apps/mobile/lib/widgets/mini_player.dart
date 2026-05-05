@@ -86,6 +86,42 @@ class MiniPlayer extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
+                        PopupMenuButton<double>(
+                          tooltip: 'Playback speed',
+                          initialValue: playback.speed,
+                          onSelected: playback.setSpeed,
+                          itemBuilder: (context) => [
+                            for (final s in [
+                              0.5,
+                              0.75,
+                              1.0,
+                              1.25,
+                              1.5,
+                              1.75,
+                              2.0
+                            ])
+                              PopupMenuItem(
+                                value: s,
+                                child: Text('${s}x'),
+                              ),
+                          ],
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${playback.speed}x',
+                              style: const TextStyle(
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
                         IconButton.filled(
                           tooltip: playback.isPlaying ? 'Pause' : 'Play',
                           style: IconButton.styleFrom(

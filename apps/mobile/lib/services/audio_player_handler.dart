@@ -17,6 +17,7 @@ class PodcastAudioHandler extends BaseAudioHandler with SeekHandler {
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
+  Stream<double> get speedStream => _player.speedStream;
   Duration get duration => _player.duration ?? Duration.zero;
 
   Future<void> _init() async {
@@ -149,6 +150,14 @@ class PodcastAudioHandler extends BaseAudioHandler with SeekHandler {
     await _player
         .seek(newPosition < Duration.zero ? Duration.zero : newPosition);
   }
+
+  @override
+  Future<void> setSpeed(double speed) async {
+    await _ready;
+    await _player.setSpeed(speed);
+  }
+
+  double get speed => _player.speed;
 
   Future<void> setEpisode(Episode episode) async {
     await _ready;
