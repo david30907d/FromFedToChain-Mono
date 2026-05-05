@@ -159,23 +159,22 @@ class PodcastAudioHandler extends BaseAudioHandler with SeekHandler {
 
   double get speed => _player.speed;
 
-  Future<void> setEpisode(Episode episode) async {
+  Future<void> setEpisode(Episode episode, {AudioTrack? audioTrack}) async {
     await _ready;
+    final track = audioTrack?.isPlayable == true ? audioTrack : null;
+    final url = track?.hlsUrl ?? episode.hlsUrl;
 
-    final newMediaItem = MediaItem(
-      id: episode.id,
-      album: 'AI Podcast',
-      title: episode.title,
-      artist: 'From Fed to Chain',
-      duration: Duration.zero,
-      extras: {'url': episode.hlsUrl},
+    final newMediaItem = _mediaItemFor(
+      episode,
+      url: url,
+      audioTrack: track,
     );
 
     mediaItem.add(newMediaItem);
 
     try {
       await _player.setAudioSource(
-        AudioSource.uri(Uri.parse(episode.hlsUrl)),
+        AudioSource.uri(Uri.parse(url)),
       );
     } catch (_) {
       playbackState.add(
@@ -185,6 +184,64 @@ class PodcastAudioHandler extends BaseAudioHandler with SeekHandler {
       );
       rethrow;
     }
+  }
+
+  Future<void> setAudioTrack(Episode episode, AudioTrack track) async {
+    await _ready;
+
+    final previousPosition = _player.position;
+    final wasPlaying = _player.playing;
+    final currentSpeed = _player.speed;
+
+    mediaItem.add(_mediaItemFor(
+      episode,
+      url: track.hlsUrl,
+      audioTrack: track,
+    ));
+
+    try {
+      final duration = await _player.setAudioSource(
+        AudioSource.uri(Uri.parse(track.hlsUrl)),
+      );
+      final seekPosition = duration != null && previousPosition > duration
+          ? duration
+          : previousPosition;
+      if (seekPosition > Duration.zero) {
+        await _player.seek(seekPosition);
+      }
+      if (_player.speed != currentSpeed) {
+        await _player.setSpeed(currentSpeed);
+      }
+      if (wasPlaying) {
+        await _player.play();
+      }
+    } catch (_) {
+      playbackState.add(
+        playbackState.value.copyWith(
+          processingState: AudioProcessingState.error,
+        ),
+      );
+      rethrow;
+    }
+  }
+
+  MediaItem _mediaItemFor(
+    Episode episode, {
+    required String url,
+    AudioTrack? audioTrack,
+  }) {
+    return MediaItem(
+      id: episode.id,
+      album: 'AI Podcast',
+      title: episode.title,
+      artist: 'From Fed to Chain',
+      duration: Duration.zero,
+      extras: {
+        'url': url,
+        if (audioTrack != null) 'languageCode': audioTrack.languageCode,
+        if (audioTrack != null) 'audioTrackTitle': audioTrack.title,
+      },
+    );
   }
 
   void _broadcastState(PlaybackEvent event) {

@@ -23,6 +23,57 @@ void main() {
       expect(episode.listened, true);
       expect(episode.likeCount, 7);
       expect(episode.script, 'This is the script content');
+      expect(episode.audioTracks, isEmpty);
+    });
+
+    test('fromJson maps camel case audio tracks', () {
+      final episode = Episode.fromJson({
+        'id': 'uuid-tracks',
+        'title': 'Tracked Episode',
+        'hlsUrl': 'https://cdn.example.com/fallback.m3u8',
+        'createdAt': '2024-01-05T12:00:00.000Z',
+        'audioTracks': [
+          {
+            'languageCode': 'zh-Hant',
+            'title': '繁中',
+            'hlsUrl': 'https://cdn.example.com/zh.m3u8',
+          },
+          {
+            'languageCode': 'en',
+            'title': 'EN',
+            'hlsUrl': 'https://cdn.example.com/en.m3u8',
+          },
+        ],
+      });
+
+      expect(episode.audioTracks, hasLength(2));
+      expect(episode.audioTracks.first.languageCode, 'zh-Hant');
+      expect(episode.audioTracks.first.title, '繁中');
+      expect(
+          episode.audioTracks.first.hlsUrl, 'https://cdn.example.com/zh.m3u8');
+      expect(episode.audioTracks.last.languageCode, 'en');
+    });
+
+    test('fromJson maps snake case audio tracks', () {
+      final episode = Episode.fromJson({
+        'id': 'uuid-snake-tracks',
+        'title': 'Snake Track Episode',
+        'hls_url': 'https://cdn.example.com/fallback.m3u8',
+        'created_at': '2024-01-06T12:00:00.000Z',
+        'audio_tracks': [
+          {
+            'language_code': 'ja',
+            'title': '日本語',
+            'hls_url': 'https://cdn.example.com/ja.m3u8',
+          },
+        ],
+      });
+
+      expect(episode.audioTracks, hasLength(1));
+      expect(episode.audioTracks.single.languageCode, 'ja');
+      expect(episode.audioTracks.single.title, '日本語');
+      expect(
+          episode.audioTracks.single.hlsUrl, 'https://cdn.example.com/ja.m3u8');
     });
 
     test('fromJson maps Supabase snake case fields', () {
@@ -85,6 +136,7 @@ void main() {
       expect(updated.title, original.title);
       expect(updated.likeCount, 2);
       expect(updated.script, 'New script');
+      expect(updated.audioTracks, isEmpty);
     });
 
     test('copyWith preserves script when not provided', () {
@@ -101,6 +153,33 @@ void main() {
 
       expect(updated.script, 'Preserved script');
       expect(updated.title, 'Updated Title');
+    });
+
+    test('copyWith preserves and overrides audio tracks', () {
+      const chineseTrack = AudioTrack(
+        languageCode: 'zh-Hant',
+        title: '繁中',
+        hlsUrl: 'https://example.com/zh.m3u8',
+      );
+      const englishTrack = AudioTrack(
+        languageCode: 'en',
+        title: 'EN',
+        hlsUrl: 'https://example.com/en.m3u8',
+      );
+      final original = Episode(
+        id: 'uuid-123',
+        title: 'Original',
+        hlsUrl: 'https://example.com/fallback.m3u8',
+        createdAt: DateTime(2024, 1, 1),
+        listened: false,
+        audioTracks: const [chineseTrack],
+      );
+
+      final preserved = original.copyWith(title: 'Updated Title');
+      final overridden = original.copyWith(audioTracks: const [englishTrack]);
+
+      expect(preserved.audioTracks, const [chineseTrack]);
+      expect(overridden.audioTracks, const [englishTrack]);
     });
   });
 }

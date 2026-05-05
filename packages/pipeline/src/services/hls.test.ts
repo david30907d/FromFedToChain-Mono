@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, type Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 interface FfmpegMock {
   setFfmpegPath: Mock;
@@ -9,6 +9,8 @@ interface FfmpegMock {
   output: Mock;
   on: Mock;
   run: Mock;
+  input: Mock;
+  complexFilter: Mock;
   mockReturnThis: () => FfmpegMock;
   [key: string]: Mock | ((...args: unknown[]) => FfmpegMock);
 }
@@ -25,6 +27,8 @@ const createFfmpegMock = (): FfmpegMock => ({
     return vi.mocked(createFfmpegMock());
   }),
   run: vi.fn(),
+  input: vi.fn().mockReturnThis(),
+  complexFilter: vi.fn().mockReturnThis(),
   mockReturnThis: function (this: FfmpegMock) {
     return this;
   },
@@ -69,28 +73,93 @@ vi.mock('crypto', () => ({
 }));
 
 describe('generateHls', { timeout: 10000 }, () => {
+  beforeEach(async () => {
+    const { readdirSync, readFileSync, statSync } = await import('node:fs');
+    vi.mocked(readdirSync).mockReturnValue([]);
+    vi.mocked(readFileSync).mockReturnValue(Buffer.alloc(0));
+    vi.mocked(statSync).mockReturnValue({
+      isFile: () => true,
+    } as unknown as ReturnType<typeof statSync>);
+  });
+
+  it('cleans up temp files in finally block on success', async () => {
+    const { default: ffmpeg } = await import('fluent-ffmpeg');
+    const { unlinkSync, rmdirSync, readdirSync } = await import('node:fs');
+
+    vi.mocked(readdirSync).mockReturnValue(
+      ['playlist.m3u8', 'seg1.ts', 'seg2.ts'] as unknown as ReturnType<typeof readdirSync>,
+    );
+
+    const mockFfmpeg = vi.mocked(ffmpeg);
+    mockFfmpeg.mockImplementation(() => createFfmpegMock() as unknown as ReturnType<typeof ffmpeg>);
+
+    const { generateHls } = await import('./hls.js');
+    await generateHls(Buffer.alloc(100));
+
+    expect(vi.mocked(unlinkSync).mock.calls.length).toBeGreaterThan(0);
+    expect(vi.mocked(rmdirSync).mock.calls.length).toBeGreaterThan(0);
+  });
+
+  it('handles non-standard file extensions in getContentType default case', async () => {
+    const { default: ffmpeg } = await import('fluent-ffmpeg');
+    const { readdirSync, readFileSync } = await import('node:fs');
+
+    vi.mocked(readdirSync).mockReturnValue(
+      ['playlist.m3u8', 'seg1.ts', 'extra.json', 'data.bin'] as unknown as ReturnType<
+        typeof readdirSync
+      >,
+    );
+    vi.mocked(readFileSync).mockReturnValue(Buffer.alloc(0));
+
+    const mockFfmpeg = vi.mocked(ffmpeg);
+    mockFfmpeg.mockImplementation(() => createFfmpegMock() as unknown as ReturnType<typeof ffmpeg>);
+
+    const { generateHls } = await import('./hls.js');
+    const result = await generateHls(Buffer.alloc(100));
+
+    const extraJson = result.files.find((f) => f.name === 'extra.json');
+    const dataBin = result.files.find((f) => f.name === 'data.bin');
+    expect(extraJson?.contentType).toBe('application/octet-stream');
+    expect(dataBin?.contentType).toBe('application/octet-stream');
+  });
+
+  it('cleans up temp files in finally block when readdirSync throws', async () => {
+    const { unlinkSync, rmdirSync, readdirSync } = await import('node:fs');
+    vi.mocked(readdirSync).mockImplementation(() => {
+      throw new Error('readdir error');
+    });
+
+    const { default: ffmpeg } = await import('fluent-ffmpeg');
+    const mockFfmpeg = vi.mocked(ffmpeg);
+    mockFfmpeg.mockImplementation(() => createFfmpegMock() as unknown as ReturnType<typeof ffmpeg>);
+
+    const { generateHls } = await import('./hls.js');
+    await expect(generateHls(Buffer.alloc(100))).rejects.toThrow();
+
+    expect(vi.mocked(unlinkSync).mock.calls.length).toBeGreaterThan(0);
+    expect(vi.mocked(rmdirSync).mock.calls.length).toBeGreaterThan(0);
+  });
+
   it('throws when no files are generated', async () => {
     const { default: ffmpeg } = await import('fluent-ffmpeg');
     const mockFfmpeg = vi.mocked(ffmpeg);
     mockFfmpeg.mockImplementation(() => createFfmpegMock() as unknown as ReturnType<typeof ffmpeg>);
 
     const { generateHls } = await import('./hls.js');
-
     await expect(generateHls(Buffer.alloc(100))).rejects.toThrow('No HLS files were generated');
   });
 
   it('throws when playlist file is not generated', async () => {
+    const { readdirSync } = await import('node:fs');
+    vi.mocked(readdirSync).mockReturnValue(
+      ['seg1.ts', 'seg2.ts'] as unknown as ReturnType<typeof readdirSync>,
+    );
+
     const { default: ffmpeg } = await import('fluent-ffmpeg');
     const mockFfmpeg = vi.mocked(ffmpeg);
     mockFfmpeg.mockImplementation(() => createFfmpegMock() as unknown as ReturnType<typeof ffmpeg>);
 
-    const { readdirSync } = await import('node:fs');
-    vi.mocked(readdirSync).mockReturnValue(['seg1.ts', 'seg2.ts'] as unknown as ReturnType<
-      typeof readdirSync
-    >);
-
     const { generateHls } = await import('./hls.js');
-
     await expect(generateHls(Buffer.alloc(100))).rejects.toThrow('Playlist file was not generated');
   });
 });

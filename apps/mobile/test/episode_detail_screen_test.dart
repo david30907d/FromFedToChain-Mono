@@ -63,16 +63,88 @@ void main() {
     expect(find.byType(EpisodeDetailScreen), findsOneWidget);
     expect(find.text('Latest macro cycle'), findsWidgets);
   });
+
+  testWidgets('Episode detail speed menu updates playback speed',
+      (tester) async {
+    final handler = FakePodcastAudioHandler();
+    final provider = PlaybackProvider(handler);
+
+    await _pumpHarness(
+      tester,
+      EpisodeDetailScreen(episode: _episode()),
+      playbackProvider: provider,
+    );
+
+    expect(find.text('1.0x'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Playback speed'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('1.5x').last);
+    await tester.pumpAndSettle();
+
+    expect(handler.speed, 1.5);
+    expect(find.text('1.5x'), findsOneWidget);
+
+    provider.dispose();
+    await handler.dispose();
+  });
+
+  testWidgets('Episode detail shows language pill and switches tracks',
+      (tester) async {
+    final handler = FakePodcastAudioHandler();
+    final provider = PlaybackProvider(handler);
+    final episode = _episodeWithTracks();
+
+    await _pumpHarness(
+      tester,
+      EpisodeDetailScreen(episode: episode),
+      playbackProvider: provider,
+    );
+
+    expect(find.text('繁中'), findsOneWidget);
+    expect(find.text('EN'), findsOneWidget);
+    expect(find.text('日本語'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Play'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('EN'));
+    await tester.pumpAndSettle();
+
+    expect(provider.currentAudioTrack, episode.audioTracks[1]);
+    expect(handler.currentAudioTrack, episode.audioTracks[1]);
+
+    provider.dispose();
+    await handler.dispose();
+  });
+
+  testWidgets('Episode detail hides language pill for fallback-only audio',
+      (tester) async {
+    await _pumpHarness(
+      tester,
+      EpisodeDetailScreen(episode: _episode()),
+    );
+
+    expect(find.text('繁中'), findsNothing);
+    expect(find.text('EN'), findsNothing);
+    expect(find.text('日本語'), findsNothing);
+  });
 }
 
-Future<void> _pumpHarness(WidgetTester tester, Widget child) async {
+Future<void> _pumpHarness(
+  WidgetTester tester,
+  Widget child, {
+  PlaybackProvider? playbackProvider,
+}) async {
   await tester.pumpWidget(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(
-          create: (_) => PlaybackProvider(FakePodcastAudioHandler()),
-        ),
+        if (playbackProvider == null)
+          ChangeNotifierProvider(
+            create: (_) => PlaybackProvider(FakePodcastAudioHandler()),
+          )
+        else
+          ChangeNotifierProvider.value(value: playbackProvider),
         ChangeNotifierProvider(create: (_) => LikesProvider()),
       ],
       child: MaterialApp(
@@ -82,6 +154,28 @@ Future<void> _pumpHarness(WidgetTester tester, Widget child) async {
     ),
   );
   await tester.pump();
+}
+
+Episode _episodeWithTracks() {
+  return _episode().copyWith(
+    audioTracks: const [
+      AudioTrack(
+        languageCode: 'zh-Hant',
+        title: '繁中',
+        hlsUrl: 'https://cdn.example.com/episode-1-zh.m3u8',
+      ),
+      AudioTrack(
+        languageCode: 'en',
+        title: 'EN',
+        hlsUrl: 'https://cdn.example.com/episode-1-en.m3u8',
+      ),
+      AudioTrack(
+        languageCode: 'ja',
+        title: '日本語',
+        hlsUrl: 'https://cdn.example.com/episode-1-ja.m3u8',
+      ),
+    ],
+  );
 }
 
 Episode _episode({

@@ -1,15 +1,23 @@
 import 'package:ai_podcast_mobile/models/episode.dart';
+import 'package:ai_podcast_mobile/screens/episode_detail_screen.dart';
+import 'package:ai_podcast_mobile/state/auth_provider.dart';
+import 'package:ai_podcast_mobile/state/likes_provider.dart';
 import 'package:ai_podcast_mobile/state/playback_provider.dart';
 import 'package:ai_podcast_mobile/theme/app_theme.dart';
 import 'package:ai_podcast_mobile/widgets/mini_player.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'fakes/fake_podcast_audio_handler.dart';
 
 void main() {
-  testWidgets('speed menu updates playback speed through the provider',
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets('hides speed menu and opens episode detail when tapped',
       (tester) async {
     final handler = FakePodcastAudioHandler();
     final provider = PlaybackProvider(handler);
@@ -24,8 +32,12 @@ void main() {
     await provider.toggle(episode);
 
     await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: provider,
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AuthProvider()),
+          ChangeNotifierProvider.value(value: provider),
+          ChangeNotifierProvider(create: (_) => LikesProvider()),
+        ],
         child: MaterialApp(
           theme: AppTheme.dark(),
           home: const Scaffold(body: MiniPlayer()),
@@ -34,15 +46,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('1.0x'), findsOneWidget);
+    expect(find.byTooltip('Playback speed'), findsNothing);
+    expect(find.text('1.0x'), findsNothing);
+    expect(find.byType(EpisodeDetailScreen), findsNothing);
 
-    await tester.tap(find.byTooltip('Playback speed'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('1.5x').last);
+    await tester.tap(find.text('Test episode'));
     await tester.pumpAndSettle();
 
-    expect(handler.speed, 1.5);
-    expect(find.text('1.5x'), findsOneWidget);
+    expect(find.byType(EpisodeDetailScreen), findsOneWidget);
+    expect(find.text('Test episode'), findsWidgets);
 
     provider.dispose();
     await handler.dispose();

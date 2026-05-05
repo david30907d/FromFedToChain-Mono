@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import {
   toEpisodeResponse,
@@ -189,6 +189,17 @@ describe('cursor helpers', () => {
         }),
       ),
     ).toThrow('bad cursor id');
+  });
+
+  it('rejects cursors with wrong field types', () => {
+    const invalidT = Buffer.from(JSON.stringify({ t: 123, i: '00000000-0000-4000-8000-000000000001' }), 'utf8').toString('base64url');
+    expect(() => decodeCursor(invalidT)).toThrow('bad cursor shape');
+
+    const invalidI = Buffer.from(JSON.stringify({ t: '2024-01-01T00:00:00.000Z', i: 456 }), 'utf8').toString('base64url');
+    expect(() => decodeCursor(invalidI)).toThrow('bad cursor shape');
+
+    const nullI = Buffer.from(JSON.stringify({ t: '2024-01-01T00:00:00.000Z', i: null }), 'utf8').toString('base64url');
+    expect(() => decodeCursor(nullI)).toThrow('bad cursor shape');
   });
 });
 

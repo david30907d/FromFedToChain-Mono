@@ -6,12 +6,20 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       thresholds: {
-        lines: 80,
-        functions: 80,
-        branches: 80,
-        statements: 80,
+        lines: 90,
+        functions: 90,
+        branches: 90,
+        statements: 90,
       },
-      exclude: ['**/*.test.ts', '**/node_modules/**', '**/dist/**', '**/.git/**', 'src/index.ts'],
+      exclude: [
+        '**/*.test.ts',
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/.git/**',
+        'src/index.ts',
+        'src/types.ts',
+        'vitest.config.ts',
+      ],
     },
   },
 });

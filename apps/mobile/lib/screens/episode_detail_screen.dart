@@ -9,6 +9,7 @@ import '../state/playback_provider.dart';
 import '../theme/colors.dart';
 import '../utils/date_format.dart';
 import '../widgets/like_button.dart';
+import '../widgets/playback_speed_menu.dart';
 import '../widgets/share_button.dart';
 
 typedef EpisodeToggleListened = FutureOr<void> Function(Episode episode);
@@ -305,89 +306,116 @@ class _PlaybackControlsState extends State<_PlaybackControls> {
         : 0.0;
     final sliderValue = (_scrubValue ?? liveValue).clamp(0.0, maxValue);
     final displayedPosition = Duration(milliseconds: sliderValue.round());
+    final audioTracks = widget.episode.playableAudioTracks;
+    final selectedAudioTrack = isCurrent && playback.currentAudioTrack != null
+        ? playback.currentAudioTrack
+        : audioTracks.isNotEmpty
+            ? audioTracks.first
+            : null;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: SizedBox(
-        height: 56,
-        child: Row(
-          children: [
-            AnimatedScale(
-              scale: _pressed ? 0.96 : 1,
-              duration: const Duration(milliseconds: 90),
-              curve: Curves.easeOutCubic,
-              child: IconButton.filled(
-                tooltip: isPlaying ? 'Pause' : 'Play',
-                style: IconButton.styleFrom(
-                  fixedSize: const Size.square(52),
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.background,
+      child: Column(
+        children: [
+          SizedBox(
+            height: 56,
+            child: Row(
+              children: [
+                AnimatedScale(
+                  scale: _pressed ? 0.96 : 1,
+                  duration: const Duration(milliseconds: 90),
+                  curve: Curves.easeOutCubic,
+                  child: IconButton.filled(
+                    tooltip: isPlaying ? 'Pause' : 'Play',
+                    style: IconButton.styleFrom(
+                      fixedSize: const Size.square(52),
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: AppColors.background,
+                    ),
+                    onPressed: isLoading ? null : _togglePlayback,
+                    icon: isLoading
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.background,
+                            ),
+                          )
+                        : Icon(
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            size: 28,
+                          ),
+                  ),
                 ),
-                onPressed: isLoading ? null : _togglePlayback,
-                icon: isLoading
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.background,
-                        ),
-                      )
-                    : Icon(
-                        isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                        size: 28,
+                const SizedBox(width: 12),
+                Text(
+                  _formatDuration(displayedPosition),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textPrimary,
                       ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              _formatDuration(displayedPosition),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: AppColors.accent,
-                  inactiveTrackColor: AppColors.divider,
-                  thumbColor: AppColors.accent,
-                  overlayColor: AppColors.accent.withValues(alpha: 0.16),
-                  trackHeight: 4,
-                  thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 6,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: AppColors.accent,
+                      inactiveTrackColor: AppColors.divider,
+                      thumbColor: AppColors.accent,
+                      overlayColor: AppColors.accent.withValues(alpha: 0.16),
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 6,
+                      ),
+                    ),
+                    child: Slider(
+                      value: sliderValue,
+                      min: 0,
+                      max: maxValue,
+                      onChangeStart: durationMs > 0 && isCurrent
+                          ? (value) => setState(() => _scrubValue = value)
+                          : null,
+                      onChanged: durationMs > 0 && isCurrent
+                          ? (value) => setState(() => _scrubValue = value)
+                          : null,
+                      onChangeEnd: durationMs > 0 && isCurrent
+                          ? (value) async {
+                              setState(() => _scrubValue = null);
+                              await context.read<PlaybackProvider>().seek(
+                                    Duration(milliseconds: value.round()),
+                                  );
+                            }
+                          : null,
+                    ),
                   ),
                 ),
-                child: Slider(
-                  value: sliderValue,
-                  min: 0,
-                  max: maxValue,
-                  onChangeStart: durationMs > 0 && isCurrent
-                      ? (value) => setState(() => _scrubValue = value)
-                      : null,
-                  onChanged: durationMs > 0 && isCurrent
-                      ? (value) => setState(() => _scrubValue = value)
-                      : null,
-                  onChangeEnd: durationMs > 0 && isCurrent
-                      ? (value) async {
-                          setState(() => _scrubValue = null);
-                          await context.read<PlaybackProvider>().seek(
-                                Duration(milliseconds: value.round()),
-                              );
-                        }
-                      : null,
+                const SizedBox(width: 8),
+                Text(
+                  _formatDuration(duration),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-              ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Text(
-              _formatDuration(duration),
-              style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: PlaybackSpeedMenu(
+              speed: playback.speed,
+              onSelected: playback.setSpeed,
+            ),
+          ),
+          if (audioTracks.length > 1) ...[
+            const SizedBox(height: 10),
+            _AudioTrackPill(
+              tracks: audioTracks,
+              selectedTrack: selectedAudioTrack,
+              enabled: isCurrent,
+              onSelected: playback.setAudioTrack,
             ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -403,6 +431,118 @@ class _PlaybackControlsState extends State<_PlaybackControls> {
       return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
     }
     return '$minutes:${twoDigits(seconds)}';
+  }
+}
+
+class _AudioTrackPill extends StatelessWidget {
+  const _AudioTrackPill({
+    required this.tracks,
+    required this.selectedTrack,
+    required this.enabled,
+    required this.onSelected,
+  });
+
+  final List<AudioTrack> tracks;
+  final AudioTrack? selectedTrack;
+  final bool enabled;
+  final ValueChanged<AudioTrack> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Opacity(
+      opacity: enabled ? 1 : 0.78,
+      child: SizedBox(
+        height: 38,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceElevated,
+            borderRadius: BorderRadius.circular(19),
+            border: Border.all(color: AppColors.divider),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(3),
+            child: Row(
+              children: [
+                for (final track in tracks)
+                  Expanded(
+                    child: _AudioTrackSegment(
+                      track: track,
+                      selected: track == selectedTrack,
+                      enabled: enabled,
+                      textStyle: theme.textTheme.bodySmall,
+                      onSelected: onSelected,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AudioTrackSegment extends StatelessWidget {
+  const _AudioTrackSegment({
+    required this.track,
+    required this.selected,
+    required this.enabled,
+    required this.textStyle,
+    required this.onSelected,
+  });
+
+  final AudioTrack track;
+  final bool selected;
+  final bool enabled;
+  final TextStyle? textStyle;
+  final ValueChanged<AudioTrack> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = track.title.isNotEmpty ? track.title : track.languageCode;
+
+    return Tooltip(
+      message: 'Switch audio to $label',
+      child: IgnorePointer(
+        ignoring: !enabled,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => onSelected(track),
+          child: AnimatedContainer(
+            height: double.infinity,
+            alignment: Alignment.center,
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            decoration: BoxDecoration(
+              color: selected ? AppColors.accent : Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                maxLines: 1,
+                style: textStyle?.copyWith(
+                      color: selected
+                          ? AppColors.background
+                          : AppColors.textSecondary,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+                    ) ??
+                    TextStyle(
+                      color: selected
+                          ? AppColors.background
+                          : AppColors.textSecondary,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+                    ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

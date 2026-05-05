@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/episode.dart';
 import '../services/audio_player_handler.dart';
@@ -9,7 +10,10 @@ import '../services/audio_player_handler.dart';
 class PlaybackProvider extends ChangeNotifier {
   PlaybackProvider(this._handler) {
     _listen();
+    unawaited(_loadSpeed());
   }
+
+  static const _speedKey = 'playback_speed';
 
   final PodcastAudioHandler _handler;
 
@@ -24,6 +28,7 @@ class PlaybackProvider extends ChangeNotifier {
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   double _speed = 1.0;
+  AudioTrack? _currentAudioTrack;
 
   Episode? get currentEpisode => _currentEpisode;
   bool get isPlaying => _isPlaying;
@@ -31,6 +36,7 @@ class PlaybackProvider extends ChangeNotifier {
   Duration get position => _position;
   Duration get duration => _duration;
   double get speed => _speed;
+  AudioTrack? get currentAudioTrack => _currentAudioTrack;
 
   bool isEpisodePlaying(String id) {
     return _currentEpisode?.id == id && _isPlaying;
@@ -48,6 +54,14 @@ class PlaybackProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _loadSpeed() async {
+    final prefs = await SharedPreferences.getInstance();
+    final speed = prefs.getDouble(_speedKey);
+    if (speed == null) return;
+
+    await _handler.setSpeed(speed);
+  }
+
   Future<void> toggle(Episode episode) async {
     if (_currentEpisode?.id == episode.id) {
       if (_isPlaying) {
@@ -58,14 +72,17 @@ class PlaybackProvider extends ChangeNotifier {
       return;
     }
 
+    final selectedTrack = _defaultAudioTrackFor(episode);
+
     _loadingEpisodeId = episode.id;
     _currentEpisode = episode;
+    _currentAudioTrack = selectedTrack;
     _position = Duration.zero;
     _duration = Duration.zero;
     notifyListeners();
 
     try {
-      await _handler.setEpisode(episode);
+      await _handler.setEpisode(episode, audioTrack: selectedTrack);
       await _handler.play();
     } finally {
       _loadingEpisodeId = null;
@@ -85,8 +102,32 @@ class PlaybackProvider extends ChangeNotifier {
     return _handler.seek(position);
   }
 
-  Future<void> setSpeed(double speed) {
-    return _handler.setSpeed(speed);
+  Future<void> setSpeed(double speed) async {
+    await _handler.setSpeed(speed);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_speedKey, speed);
+  }
+
+  Future<void> setAudioTrack(AudioTrack track) async {
+    final episode = _currentEpisode;
+    if (episode == null) return;
+
+    final playableTracks = episode.playableAudioTracks;
+    if (!playableTracks.contains(track) || _currentAudioTrack == track) {
+      return;
+    }
+
+    final previousTrack = _currentAudioTrack;
+    _currentAudioTrack = track;
+    notifyListeners();
+
+    try {
+      await _handler.setAudioTrack(episode, track);
+    } catch (_) {
+      _currentAudioTrack = previousTrack;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   void _handleState(PlayerState state) {
@@ -94,6 +135,7 @@ class PlaybackProvider extends ChangeNotifier {
     if (state.processingState == ProcessingState.completed) {
       _isPlaying = false;
       _currentEpisode = null;
+      _currentAudioTrack = null;
       _position = Duration.zero;
       _duration = Duration.zero;
     }
@@ -118,5 +160,11 @@ class PlaybackProvider extends ChangeNotifier {
     _speedSubscription?.cancel();
     unawaited(_handler.dispose());
     super.dispose();
+  }
+
+  AudioTrack? _defaultAudioTrackFor(Episode episode) {
+    final tracks = episode.playableAudioTracks;
+    if (tracks.isEmpty) return null;
+    return tracks.first;
   }
 }

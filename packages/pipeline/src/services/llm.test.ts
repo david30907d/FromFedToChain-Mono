@@ -54,6 +54,24 @@ describe('buildUserMessage', () => {
   });
 });
 
+describe('getSystemPrompt error handling', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('throws when prompt file cannot be read', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', 'test-api-key');
+    vi.stubEnv('SCRIPT_PROMPT_PATH', '/nonexistent/prompt.txt');
+
+    const { generateScriptWithLLM: freshGenerate } = await import('./llm.js');
+    await expect(freshGenerate('Title', 'Text')).rejects.toThrow(/Prompt file not found at/);
+  });
+});
+
 describe('generateScriptWithLLM', () => {
   beforeEach(() => {
     vi.stubEnv('OPENROUTER_API_KEY', 'test-api-key');
@@ -170,4 +188,6 @@ describe('generateScriptWithLLM', () => {
 
     expect(result.model).toBe('fallback/model');
   });
+
+  
 });

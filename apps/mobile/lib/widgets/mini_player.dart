@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../screens/episode_detail_screen.dart';
 import '../state/playback_provider.dart';
 import '../theme/colors.dart';
 
@@ -24,124 +25,101 @@ class MiniPlayer extends StatelessWidget {
             : SafeArea(
                 top: false,
                 minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceElevated,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.divider),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.32),
-                        blurRadius: 24,
-                        offset: const Offset(0, 12),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => EpisodeDetailScreen(episode: episode),
                       ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [AppColors.accent, AppColors.accentMuted],
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.graphic_eq_rounded,
-                            color: AppColors.background,
-                            size: 22,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Now playing',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color: AppColors.accent,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                episode.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(fontSize: 14),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        PopupMenuButton<double>(
-                          tooltip: 'Playback speed',
-                          initialValue: playback.speed,
-                          onSelected: playback.setSpeed,
-                          itemBuilder: (context) => [
-                            for (final s in [
-                              0.5,
-                              0.75,
-                              1.0,
-                              1.25,
-                              1.5,
-                              1.75,
-                              2.0
-                            ])
-                              PopupMenuItem(
-                                value: s,
-                                child: Text('${s}x'),
-                              ),
-                          ],
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              '${playback.speed}x',
-                              style: const TextStyle(
-                                color: AppColors.accent,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ),
-                        IconButton.filled(
-                          tooltip: playback.isPlaying ? 'Pause' : 'Play',
-                          style: IconButton.styleFrom(
-                            backgroundColor: AppColors.accent,
-                            foregroundColor: AppColors.background,
-                          ),
-                          icon: Icon(
-                            playback.isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                          ),
-                          onPressed: () {
-                            if (playback.isPlaying) {
-                              playback.pause();
-                            } else {
-                              playback.resume();
-                            }
-                          },
+                    );
+                  },
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.divider),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.32),
+                          blurRadius: 24,
+                          offset: const Offset(0, 12),
                         ),
                       ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.accent,
+                                  AppColors.accentMuted,
+                                ],
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.graphic_eq_rounded,
+                              color: AppColors.background,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Now playing',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: AppColors.accent,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  episode.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton.filled(
+                            tooltip: playback.isPlaying ? 'Pause' : 'Play',
+                            style: IconButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: AppColors.background,
+                            ),
+                            icon: Icon(
+                              playback.isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                            ),
+                            onPressed: () {
+                              if (playback.isPlaying) {
+                                playback.pause();
+                              } else {
+                                playback.resume();
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
