@@ -4,6 +4,7 @@ dist/
 .env
 .env.*
 !.env.example
+.claude/worktrees
 
 # Flutter
 apps/mobile/.dart_tool/

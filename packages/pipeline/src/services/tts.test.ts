@@ -29,7 +29,9 @@ vi.mock('fluent-ffmpeg', () => {
     outputOptions: vi.fn().mockReturnThis(),
     output: vi.fn().mockReturnThis(),
   };
-  const mockDefault = vi.fn(() => chain) as unknown as typeof chain & { setFfmpegPath: typeof chain.setFfmpegPath };
+  const mockDefault = vi.fn(() => chain) as unknown as typeof chain & {
+    setFfmpegPath: typeof chain.setFfmpegPath;
+  };
   mockDefault.setFfmpegPath = vi.fn().mockReturnThis();
   return { default: mockDefault };
 });
@@ -265,7 +267,8 @@ describe('concatenateAudioChunks', () => {
 
   it('concatenates multiple chunks using ffmpeg with dynamic fs import', async () => {
     vi.mock('node:fs', async () => {
-      const { writeFileSync, unlinkSync } = await vi.importActual<typeof import('node:fs')>('node:fs');
+      const { writeFileSync, unlinkSync } =
+        await vi.importActual<typeof import('node:fs')>('node:fs');
       return {
         writeFileSync,
         unlinkSync,

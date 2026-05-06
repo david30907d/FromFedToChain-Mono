@@ -86,9 +86,11 @@ describe('generateHls', { timeout: 10000 }, () => {
     const { default: ffmpeg } = await import('fluent-ffmpeg');
     const { unlinkSync, rmdirSync, readdirSync } = await import('node:fs');
 
-    vi.mocked(readdirSync).mockReturnValue(
-      ['playlist.m3u8', 'seg1.ts', 'seg2.ts'] as unknown as ReturnType<typeof readdirSync>,
-    );
+    vi.mocked(readdirSync).mockReturnValue([
+      'playlist.m3u8',
+      'seg1.ts',
+      'seg2.ts',
+    ] as unknown as ReturnType<typeof readdirSync>);
 
     const mockFfmpeg = vi.mocked(ffmpeg);
     mockFfmpeg.mockImplementation(() => createFfmpegMock() as unknown as ReturnType<typeof ffmpeg>);
@@ -104,11 +106,12 @@ describe('generateHls', { timeout: 10000 }, () => {
     const { default: ffmpeg } = await import('fluent-ffmpeg');
     const { readdirSync, readFileSync } = await import('node:fs');
 
-    vi.mocked(readdirSync).mockReturnValue(
-      ['playlist.m3u8', 'seg1.ts', 'extra.json', 'data.bin'] as unknown as ReturnType<
-        typeof readdirSync
-      >,
-    );
+    vi.mocked(readdirSync).mockReturnValue([
+      'playlist.m3u8',
+      'seg1.ts',
+      'extra.json',
+      'data.bin',
+    ] as unknown as ReturnType<typeof readdirSync>);
     vi.mocked(readFileSync).mockReturnValue(Buffer.alloc(0));
 
     const mockFfmpeg = vi.mocked(ffmpeg);
@@ -151,9 +154,9 @@ describe('generateHls', { timeout: 10000 }, () => {
 
   it('throws when playlist file is not generated', async () => {
     const { readdirSync } = await import('node:fs');
-    vi.mocked(readdirSync).mockReturnValue(
-      ['seg1.ts', 'seg2.ts'] as unknown as ReturnType<typeof readdirSync>,
-    );
+    vi.mocked(readdirSync).mockReturnValue(['seg1.ts', 'seg2.ts'] as unknown as ReturnType<
+      typeof readdirSync
+    >);
 
     const { default: ffmpeg } = await import('fluent-ffmpeg');
     const mockFfmpeg = vi.mocked(ffmpeg);

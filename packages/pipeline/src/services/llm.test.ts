@@ -188,6 +188,4 @@ describe('generateScriptWithLLM', () => {
 
     expect(result.model).toBe('fallback/model');
   });
-
-  
 });

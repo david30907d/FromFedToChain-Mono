@@ -60,28 +60,47 @@ void main() {
     await handler.dispose();
   });
 
-  test('setSpeed stores the chosen speed in local preferences', () async {
+  test('setSpeed persists the chosen speed to SharedPreferences', () async {
+    SharedPreferences.setMockInitialValues({});
     final handler = FakePodcastAudioHandler();
     final provider = PlaybackProvider(handler);
 
-    await provider.setSpeed(1.5);
+    await provider.setSpeed(1.75);
 
     final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getDouble('playback_speed'), 1.5);
+    expect(prefs.getDouble('playback_speed'), 1.75,
+        reason: 'speed must survive app restarts via local prefs');
 
     provider.dispose();
     await handler.dispose();
   });
 
-  test('constructor restores the stored speed into the handler', () async {
-    SharedPreferences.setMockInitialValues({'playback_speed': 1.75});
+  test('PlaybackProvider restores stored speed on construction', () async {
+    SharedPreferences.setMockInitialValues({'playback_speed': 1.25});
+    final handler = FakePodcastAudioHandler();
+    final provider = PlaybackProvider(handler);
+
+    // _loadSpeed() runs asynchronously from the constructor; let it settle.
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(handler.speed, 1.25,
+        reason: 'saved speed must be re-applied to the audio handler at start');
+    expect(provider.speed, 1.25);
+
+    provider.dispose();
+    await handler.dispose();
+  });
+
+  test('PlaybackProvider falls back to 1.0x when no speed is stored', () async {
+    SharedPreferences.setMockInitialValues({});
     final handler = FakePodcastAudioHandler();
     final provider = PlaybackProvider(handler);
 
     await Future<void>.delayed(Duration.zero);
 
-    expect(handler.speed, 1.75);
-    expect(provider.speed, 1.75);
+    expect(handler.speed, 1.0);
+    expect(provider.speed, 1.0);
 
     provider.dispose();
     await handler.dispose();

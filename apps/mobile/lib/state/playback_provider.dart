@@ -49,17 +49,17 @@ class PlaybackProvider extends ChangeNotifier {
     _speedSubscription = _handler.speedStream.listen(_handleSpeed);
   }
 
-  void _handleSpeed(double speed) {
-    _speed = speed;
-    notifyListeners();
-  }
-
   Future<void> _loadSpeed() async {
     final prefs = await SharedPreferences.getInstance();
     final speed = prefs.getDouble(_speedKey);
     if (speed == null) return;
 
     await _handler.setSpeed(speed);
+  }
+
+  void _handleSpeed(double speed) {
+    _speed = speed;
+    notifyListeners();
   }
 
   Future<void> toggle(Episode episode) async {
