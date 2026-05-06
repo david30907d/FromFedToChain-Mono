@@ -4,8 +4,8 @@ import 'package:ai_podcast_mobile/state/auth_provider.dart';
 import 'package:ai_podcast_mobile/state/likes_provider.dart';
 import 'package:ai_podcast_mobile/state/playback_provider.dart';
 import 'package:ai_podcast_mobile/theme/app_theme.dart';
+import 'package:ai_podcast_mobile/widgets/continue_listening_card.dart';
 import 'package:ai_podcast_mobile/widgets/episode_card.dart';
-import 'package:ai_podcast_mobile/widgets/hero_episode_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -44,20 +44,22 @@ void main() {
     expect(find.text('Full transcript body.'), findsOneWidget);
   });
 
-  testWidgets('HeroEpisodeCard opens the detail screen', (tester) async {
+  testWidgets('ContinueListeningCard opens the detail screen', (tester) async {
     final episode = _episode(title: 'Latest macro cycle');
 
     await _pumpHarness(
       tester,
-      HeroEpisodeCard(
+      ContinueListeningCard(
         episode: episode,
+        allCompleted: false,
         isPlaying: false,
+        isLoading: false,
         onPlay: () {},
         onToggleListened: () {},
       ),
     );
 
-    await tester.tap(find.byType(HeroEpisodeCard));
+    await tester.tap(find.byType(ContinueListeningCard));
     await tester.pumpAndSettle();
 
     expect(find.byType(EpisodeDetailScreen), findsOneWidget);

@@ -16,6 +16,7 @@ class FakePodcastAudioHandler extends BaseAudioHandler
 
   final List<String> loadedEpisodeIds = [];
   final List<String> loadedTrackUrls = [];
+  final List<Duration> seekPositions = [];
   int playCount = 0;
   int pauseCount = 0;
   double _speed = 1.0;
@@ -70,6 +71,12 @@ class FakePodcastAudioHandler extends BaseAudioHandler
   }
 
   @override
+  Future<void> seek(Duration position) async {
+    seekPositions.add(position);
+    _positionController.add(position);
+  }
+
+  @override
   Future<void> setSpeed(double speed) async {
     _speed = speed;
     _speedController.add(speed);
@@ -83,5 +90,15 @@ class FakePodcastAudioHandler extends BaseAudioHandler
     await _positionController.close();
     await _durationController.close();
     await _speedController.close();
+  }
+
+  void emitPosition(Duration position) {
+    _positionController.add(position);
+  }
+
+  void complete() {
+    _playerStateController.add(
+      PlayerState(false, ProcessingState.completed),
+    );
   }
 }

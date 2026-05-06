@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../state/auth_provider.dart';
 import '../theme/colors.dart';
-import 'feed_screen.dart';
+import 'home_shell.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({
@@ -56,7 +56,7 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     if (auth.currentUser != null) {
-      return const FeedScreen();
+      return const HomeShell();
     }
 
     return _BrandedScaffold(

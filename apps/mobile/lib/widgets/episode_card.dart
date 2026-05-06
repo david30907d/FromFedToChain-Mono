@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/episode.dart';
+import '../models/episode_status.dart';
 import '../screens/episode_detail_screen.dart';
 import '../theme/colors.dart';
 import '../utils/date_format.dart';
+import 'episode_status_badge.dart';
 import 'like_button.dart';
 import 'share_button.dart';
 
@@ -46,6 +48,11 @@ class _EpisodeCardState extends State<EpisodeCard> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 14),
+                  child: EpisodeStatusBadge(status: widget.episode.status),
+                ),
+                const SizedBox(width: 10),
                 _PlayButton(
                   isPlaying: widget.isPlaying,
                   isLoading: widget.isLoading,

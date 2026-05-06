@@ -1,4 +1,5 @@
 import 'package:ai_podcast_mobile/models/episode.dart';
+import 'package:ai_podcast_mobile/services/episode_service.dart';
 import 'package:ai_podcast_mobile/state/playback_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -160,6 +161,105 @@ void main() {
     provider.dispose();
     await handler.dispose();
   });
+
+  test('playSmart resumes the first in-progress episode and advances queue',
+      () async {
+    final handler = FakePodcastAudioHandler();
+    final service = _FakeEpisodeService();
+    final provider = PlaybackProvider(handler, episodeService: service)
+      ..setUser('user-1');
+    final newestUnplayed = _episode('episode-3');
+    final inProgress = _episode('episode-2').copyWith(lastPositionSeconds: 42);
+    final oldestUnplayed = _episode('episode-1');
+
+    await provider.playSmart([newestUnplayed, inProgress, oldestUnplayed]);
+
+    expect(handler.loadedEpisodeIds, ['episode-2']);
+    expect(handler.seekPositions, [const Duration(seconds: 42)]);
+    expect(handler.playCount, 1);
+    expect(provider.currentEpisode?.id, 'episode-2');
+
+    handler.complete();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(service.listenedWrites, [
+      const _ListenedWrite('user-1', 'episode-2', true),
+    ]);
+    expect(handler.loadedEpisodeIds, ['episode-2', 'episode-1']);
+    expect(handler.playCount, 2);
+    expect(provider.currentEpisode?.id, 'episode-1');
+
+    provider.dispose();
+    await handler.dispose();
+  });
+
+  test(
+      'playSmart starts the oldest unplayed episode when nothing is in progress',
+      () async {
+    final handler = FakePodcastAudioHandler();
+    final provider =
+        PlaybackProvider(handler, episodeService: _FakeEpisodeService());
+    final newestUnplayed = _episode('episode-3');
+    final completed = _episode('episode-2').copyWith(listened: true);
+    final oldestUnplayed = _episode('episode-1');
+
+    await provider.playSmart([newestUnplayed, completed, oldestUnplayed]);
+
+    expect(handler.loadedEpisodeIds, ['episode-1']);
+    expect(handler.seekPositions, isEmpty);
+    expect(provider.currentEpisode?.id, 'episode-1');
+
+    provider.dispose();
+    await handler.dispose();
+  });
+
+  test('playSmart restarts from the oldest episode when all are completed',
+      () async {
+    final handler = FakePodcastAudioHandler();
+    final provider =
+        PlaybackProvider(handler, episodeService: _FakeEpisodeService());
+    final newestCompleted = _episode('episode-3').copyWith(listened: true);
+    final middleCompleted = _episode('episode-2').copyWith(listened: true);
+    final oldestCompleted = _episode('episode-1').copyWith(listened: true);
+
+    await provider.playSmart([
+      newestCompleted,
+      middleCompleted,
+      oldestCompleted,
+    ]);
+
+    expect(handler.loadedEpisodeIds, ['episode-1']);
+    expect(provider.currentEpisode?.id, 'episode-1');
+
+    provider.dispose();
+    await handler.dispose();
+  });
+
+  test('position persistence is throttled and flush can write immediately',
+      () async {
+    final handler = FakePodcastAudioHandler();
+    final service = _FakeEpisodeService();
+    final provider = PlaybackProvider(handler, episodeService: service)
+      ..setUser('user-1');
+
+    await provider.toggle(_episode('episode-1'));
+
+    handler.emitPosition(const Duration(seconds: 3));
+    handler.emitPosition(const Duration(seconds: 8));
+    handler.emitPosition(const Duration(seconds: 13));
+    await Future<void>.delayed(Duration.zero);
+
+    await provider.flushPosition();
+
+    expect(service.positionWrites, [
+      const _PositionWrite('user-1', 'episode-1', 3),
+      const _PositionWrite('user-1', 'episode-1', 13),
+      const _PositionWrite('user-1', 'episode-1', 13),
+    ]);
+
+    provider.dispose();
+    await handler.dispose();
+  });
 }
 
 Episode _episode(String id) {
@@ -192,4 +292,73 @@ Episode _episodeWithTracks(String id) {
       ),
     ],
   );
+}
+
+class _FakeEpisodeService extends EpisodeService {
+  final List<_PositionWrite> positionWrites = [];
+  final List<_ListenedWrite> listenedWrites = [];
+
+  @override
+  Future<void> setPosition({
+    required String userId,
+    required String episodeId,
+    required int seconds,
+  }) async {
+    positionWrites.add(_PositionWrite(userId, episodeId, seconds));
+  }
+
+  @override
+  Future<void> setListened({
+    required String userId,
+    required String episodeId,
+    required bool listened,
+  }) async {
+    listenedWrites.add(_ListenedWrite(userId, episodeId, listened));
+  }
+}
+
+class _PositionWrite {
+  const _PositionWrite(this.userId, this.episodeId, this.seconds);
+
+  final String userId;
+  final String episodeId;
+  final int seconds;
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is _PositionWrite &&
+            other.userId == userId &&
+            other.episodeId == episodeId &&
+            other.seconds == seconds;
+  }
+
+  @override
+  int get hashCode => Object.hash(userId, episodeId, seconds);
+
+  @override
+  String toString() => 'PositionWrite($userId, $episodeId, $seconds)';
+}
+
+class _ListenedWrite {
+  const _ListenedWrite(this.userId, this.episodeId, this.listened);
+
+  final String userId;
+  final String episodeId;
+  final bool listened;
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is _ListenedWrite &&
+            other.userId == userId &&
+            other.episodeId == episodeId &&
+            other.listened == listened;
+  }
+
+  @override
+  int get hashCode => Object.hash(userId, episodeId, listened);
+
+  @override
+  String toString() => 'ListenedWrite($userId, $episodeId, $listened)';
 }

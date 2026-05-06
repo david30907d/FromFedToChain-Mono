@@ -5,10 +5,13 @@ import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/episode.dart';
+import '../models/episode_status.dart';
 import '../services/audio_player_handler.dart';
+import '../services/episode_service.dart';
 
 class PlaybackProvider extends ChangeNotifier {
-  PlaybackProvider(this._handler) {
+  PlaybackProvider(this._handler, {EpisodeService? episodeService})
+      : _episodeService = episodeService ?? EpisodeService() {
     _listen();
     unawaited(_loadSpeed());
   }
@@ -16,6 +19,7 @@ class PlaybackProvider extends ChangeNotifier {
   static const _speedKey = 'playback_speed';
 
   final PodcastAudioHandler _handler;
+  final EpisodeService _episodeService;
 
   StreamSubscription<PlayerState>? _subscription;
   StreamSubscription<Duration>? _positionSubscription;
@@ -29,6 +33,11 @@ class PlaybackProvider extends ChangeNotifier {
   Duration _duration = Duration.zero;
   double _speed = 1.0;
   AudioTrack? _currentAudioTrack;
+  String? _userId;
+  final List<Episode> _queue = [];
+  int _queueIndex = -1;
+  int? _lastPersistedSecond;
+  bool _advancingAfterCompletion = false;
 
   Episode? get currentEpisode => _currentEpisode;
   bool get isPlaying => _isPlaying;
@@ -49,6 +58,10 @@ class PlaybackProvider extends ChangeNotifier {
     _speedSubscription = _handler.speedStream.listen(_handleSpeed);
   }
 
+  void setUser(String userId) {
+    _userId = userId;
+  }
+
   Future<void> _loadSpeed() async {
     final prefs = await SharedPreferences.getInstance();
     final speed = prefs.getDouble(_speedKey);
@@ -65,33 +78,65 @@ class PlaybackProvider extends ChangeNotifier {
   Future<void> toggle(Episode episode) async {
     if (_currentEpisode?.id == episode.id) {
       if (_isPlaying) {
-        await _handler.pause();
+        await pause();
       } else {
         await _handler.play();
       }
       return;
     }
 
-    final selectedTrack = _defaultAudioTrackFor(episode);
-
-    _loadingEpisodeId = episode.id;
-    _currentEpisode = episode;
-    _currentAudioTrack = selectedTrack;
-    _position = Duration.zero;
-    _duration = Duration.zero;
-    notifyListeners();
-
-    try {
-      await _handler.setEpisode(episode, audioTrack: selectedTrack);
-      await _handler.play();
-    } finally {
-      _loadingEpisodeId = null;
-      notifyListeners();
-    }
+    await _persistPosition(flush: true);
+    _queue.clear();
+    _queueIndex = -1;
+    await _setEpisode(episode);
+    await _handler.play();
   }
 
-  Future<void> pause() {
-    return _handler.pause();
+  Future<void> playSmart(List<Episode> feed) async {
+    final inProgress = feed
+        .where((episode) => episode.status == EpisodeStatus.inProgress)
+        .toList(growable: false);
+    final unplayedOldestFirst = feed
+        .where((episode) => episode.status == EpisodeStatus.unplayed)
+        .toList(growable: false)
+        .reversed
+        .toList(growable: false);
+
+    Episode? start;
+    Duration startAt = Duration.zero;
+    if (inProgress.isNotEmpty) {
+      start = inProgress.first;
+      startAt = Duration(seconds: start.lastPositionSeconds);
+    } else if (unplayedOldestFirst.isNotEmpty) {
+      start = unplayedOldestFirst.first;
+    } else if (feed.isNotEmpty) {
+      start = feed.last;
+    }
+    if (start == null) return;
+
+    await _persistPosition(flush: true);
+    _queue
+      ..clear()
+      ..add(start)
+      ..addAll(inProgress.skip(1))
+      ..addAll(unplayedOldestFirst.where((episode) => episode.id != start!.id));
+    if (inProgress.isEmpty && unplayedOldestFirst.isEmpty) {
+      _queue
+        ..clear()
+        ..addAll(feed.reversed);
+    }
+    _queueIndex = 0;
+
+    await _setEpisode(start);
+    if (startAt > Duration.zero) {
+      await _handler.seek(startAt);
+    }
+    await _handler.play();
+  }
+
+  Future<void> pause() async {
+    await _handler.pause();
+    await _persistPosition(flush: true);
   }
 
   Future<void> resume() {
@@ -100,6 +145,10 @@ class PlaybackProvider extends ChangeNotifier {
 
   Future<void> seek(Duration position) {
     return _handler.seek(position);
+  }
+
+  Future<void> flushPosition() {
+    return _persistPosition(flush: true);
   }
 
   Future<void> setSpeed(double speed) async {
@@ -134,10 +183,9 @@ class PlaybackProvider extends ChangeNotifier {
     _isPlaying = state.playing;
     if (state.processingState == ProcessingState.completed) {
       _isPlaying = false;
-      _currentEpisode = null;
-      _currentAudioTrack = null;
-      _position = Duration.zero;
-      _duration = Duration.zero;
+      if (!_advancingAfterCompletion) {
+        unawaited(_handleCompleted());
+      }
     }
     notifyListeners();
   }
@@ -145,6 +193,11 @@ class PlaybackProvider extends ChangeNotifier {
   void _handlePosition(Duration position) {
     _position = position;
     notifyListeners();
+    final sec = position.inSeconds;
+    if (_lastPersistedSecond == null ||
+        (sec - _lastPersistedSecond!).abs() >= 10) {
+      unawaited(_persistPosition());
+    }
   }
 
   void _handleDuration(Duration? duration) {
@@ -166,5 +219,87 @@ class PlaybackProvider extends ChangeNotifier {
     final tracks = episode.playableAudioTracks;
     if (tracks.isEmpty) return null;
     return tracks.first;
+  }
+
+  Future<void> _setEpisode(Episode episode) async {
+    final selectedTrack = _defaultAudioTrackFor(episode);
+
+    _loadingEpisodeId = episode.id;
+    _currentEpisode = episode;
+    _currentAudioTrack = selectedTrack;
+    _position = Duration.zero;
+    _duration = Duration.zero;
+    _lastPersistedSecond = null;
+    notifyListeners();
+
+    try {
+      await _handler.setEpisode(episode, audioTrack: selectedTrack);
+    } finally {
+      _loadingEpisodeId = null;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _handleCompleted() async {
+    _advancingAfterCompletion = true;
+    try {
+      final completedEpisode = _currentEpisode;
+      if (_duration > _position) {
+        _position = _duration;
+      }
+      await _persistPosition(flush: true);
+
+      final userId = _userId;
+      if (userId != null && completedEpisode != null) {
+        await _episodeService.setListened(
+          userId: userId,
+          episodeId: completedEpisode.id,
+          listened: true,
+        );
+      }
+
+      await _advanceQueue();
+    } finally {
+      _advancingAfterCompletion = false;
+    }
+  }
+
+  Future<void> _advanceQueue() async {
+    final nextIndex = _queueIndex + 1;
+    if (nextIndex < 0 || nextIndex >= _queue.length) {
+      _queue.clear();
+      _queueIndex = -1;
+      _currentEpisode = null;
+      _currentAudioTrack = null;
+      _position = Duration.zero;
+      _duration = Duration.zero;
+      _lastPersistedSecond = null;
+      notifyListeners();
+      return;
+    }
+
+    _queueIndex = nextIndex;
+    await _setEpisode(_queue[_queueIndex]);
+    await _handler.play();
+  }
+
+  Future<void> _persistPosition({bool flush = false}) async {
+    final userId = _userId;
+    final episode = _currentEpisode;
+    if (userId == null || episode == null) return;
+
+    final seconds = _position.inSeconds;
+    if (!flush &&
+        _lastPersistedSecond != null &&
+        (seconds - _lastPersistedSecond!).abs() < 10) {
+      return;
+    }
+
+    _lastPersistedSecond = seconds;
+    await _episodeService.setPosition(
+      userId: userId,
+      episodeId: episode.id,
+      seconds: seconds,
+    );
   }
 }

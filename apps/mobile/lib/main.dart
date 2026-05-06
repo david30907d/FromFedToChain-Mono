@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/auth_gate.dart';
 import 'services/audio_player_handler.dart';
+import 'services/episode_service.dart';
 import 'state/auth_provider.dart';
 import 'state/likes_provider.dart';
 import 'state/playback_provider.dart';
@@ -74,7 +75,12 @@ class AiPodcastApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => PlaybackProvider(audioHandler)),
+        ChangeNotifierProvider(
+          create: (_) => PlaybackProvider(
+            audioHandler,
+            episodeService: EpisodeService(),
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => LikesProvider()),
       ],
       child: MaterialApp(

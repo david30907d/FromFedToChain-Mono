@@ -1,10 +1,13 @@
 import 'package:ai_podcast_mobile/models/episode.dart';
+import 'package:ai_podcast_mobile/models/episode_page.dart';
 import 'package:ai_podcast_mobile/screens/episode_detail_screen.dart';
+import 'package:ai_podcast_mobile/screens/home_shell.dart';
+import 'package:ai_podcast_mobile/config/app_config.dart';
+import 'package:ai_podcast_mobile/services/episode_service.dart';
 import 'package:ai_podcast_mobile/state/auth_provider.dart';
 import 'package:ai_podcast_mobile/state/likes_provider.dart';
 import 'package:ai_podcast_mobile/state/playback_provider.dart';
 import 'package:ai_podcast_mobile/theme/app_theme.dart';
-import 'package:ai_podcast_mobile/widgets/mini_player.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -96,16 +99,40 @@ Future<_Harness> _pumpMiniPlayer(WidgetTester tester) async {
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
-        home: const Scaffold(
-          body: Align(
-            alignment: Alignment.bottomCenter,
-            child: MiniPlayer(),
-          ),
-        ),
+        home: HomeShell(episodeService: _EmptyEpisodeService()),
       ),
     ),
   );
   await tester.pumpAndSettle();
 
   return _Harness(handler, provider);
+}
+
+class _EmptyEpisodeService extends EpisodeService {
+  @override
+  Future<Set<String>> getListenedEpisodeIds(String userId) async => {};
+
+  @override
+  Future<Map<String, UserEpisodeState>> getUserState(
+    String userId, {
+    Iterable<String>? episodeIds,
+  }) async {
+    return const {};
+  }
+
+  @override
+  Future<void> setListened({
+    required String userId,
+    required String episodeId,
+    required bool listened,
+  }) async {}
+
+  @override
+  Future<EpisodePage> getEpisodes({
+    int limit = 20,
+    String? cursor,
+    String languageCode = AppConfig.contentLanguageCode,
+  }) async {
+    return const EpisodePage(items: [], nextCursor: null);
+  }
 }

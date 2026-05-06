@@ -5,14 +5,15 @@ import 'package:provider/provider.dart';
 
 import '../models/episode.dart';
 import '../models/episode_page.dart';
+import '../models/episode_status.dart';
 import '../services/episode_service.dart';
 import '../state/auth_provider.dart';
 import '../state/likes_provider.dart';
 import '../state/playback_provider.dart';
 import '../theme/colors.dart';
+import '../widgets/continue_listening_card.dart';
 import '../widgets/episode_card.dart';
-import '../widgets/hero_episode_card.dart';
-import '../widgets/mini_player.dart';
+import '../widgets/listened_section_header.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({
@@ -38,6 +39,8 @@ class _FeedScreenState extends State<FeedScreen> {
   String? _error;
   String? _loadMoreError;
   int _requestEpoch = 0;
+  bool _listenedExpanded = false;
+  String? _playbackUserId;
 
   @override
   void initState() {
@@ -47,6 +50,7 @@ class _FeedScreenState extends State<FeedScreen> {
       final user = context.read<AuthProvider>().currentUser;
       if (user != null) {
         context.read<LikesProvider>().watchUser(user.id);
+        _bindPlaybackUser(user.id);
       }
       unawaited(_loadFirstPage());
     });
@@ -131,14 +135,27 @@ class _FeedScreenState extends State<FeedScreen> {
     final user = context.read<AuthProvider>().currentUser;
     if (user == null || episodes.isEmpty) return episodes;
 
-    final listenedIds = await _episodeService.getListenedEpisodeIds(user.id);
-    return episodes
-        .map(
-          (episode) => episode.copyWith(
-            listened: episode.listened || listenedIds.contains(episode.id),
-          ),
-        )
-        .toList(growable: false);
+    _bindPlaybackUser(user.id);
+    final states = await _episodeService.getUserState(
+      user.id,
+      episodeIds: episodes.map((episode) => episode.id),
+    );
+    return episodes.map(
+      (episode) {
+        final state = states[episode.id];
+        if (state == null) return episode;
+        return episode.copyWith(
+          listened: episode.listened || state.listened,
+          lastPositionSeconds: state.lastPositionSeconds,
+        );
+      },
+    ).toList(growable: false);
+  }
+
+  void _bindPlaybackUser(String userId) {
+    if (_playbackUserId == userId) return;
+    _playbackUserId = userId;
+    context.read<PlaybackProvider>().setUser(userId);
   }
 
   void _onScroll() {
@@ -158,7 +175,11 @@ class _FeedScreenState extends State<FeedScreen> {
       _episodes = _episodes
           .map(
             (item) => item.id == episode.id
-                ? item.copyWith(listened: nextValue)
+                ? item.copyWith(
+                    listened: nextValue,
+                    lastPositionSeconds:
+                        nextValue ? item.lastPositionSeconds : 0,
+                  )
                 : item,
           )
           .toList(growable: false);
@@ -170,6 +191,13 @@ class _FeedScreenState extends State<FeedScreen> {
         episodeId: episode.id,
         listened: nextValue,
       );
+      if (!nextValue) {
+        await _episodeService.setPosition(
+          userId: user.id,
+          episodeId: episode.id,
+          seconds: 0,
+        );
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -191,119 +219,241 @@ class _FeedScreenState extends State<FeedScreen> {
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().currentUser;
     final playback = context.watch<PlaybackProvider>();
+    if (user != null) {
+      _bindPlaybackUser(user.id);
+    }
+    final groups = _groupByStatus(_episodes);
+    final heroEpisode = _heroEpisode(groups);
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          RefreshIndicator(
-            color: AppColors.accent,
-            backgroundColor: AppColors.surfaceElevated,
-            onRefresh: _loadFirstPage,
-            child: CustomScrollView(
-              controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                SliverAppBar(
-                  pinned: true,
-                  title: const Text('From Fed to Chain'),
-                  actions: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 16),
-                      child: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: AppColors.surfaceElevated,
-                        foregroundColor: AppColors.accent,
-                        child: Text(_avatarLabel(user?.email)),
-                      ),
-                    ),
-                  ],
+    return RefreshIndicator(
+      color: AppColors.accent,
+      backgroundColor: AppColors.surfaceElevated,
+      onRefresh: _loadFirstPage,
+      child: CustomScrollView(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            title: const Text('From Fed to Chain'),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: AppColors.surfaceElevated,
+                  foregroundColor: AppColors.accent,
+                  child: Text(_avatarLabel(user?.email)),
                 ),
-                if (_loading)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (_error != null)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _ErrorState(
-                      message: _error!,
-                      onRetry: _loadFirstPage,
-                    ),
-                  )
-                else if (_episodes.isEmpty)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _EmptyState(),
-                  )
-                else ...[
-                  SliverToBoxAdapter(
-                    child: HeroEpisodeCard(
-                      episode: _episodes.first,
-                      isPlaying: playback.isEpisodePlaying(_episodes.first.id),
-                      onPlay: () => playback.toggle(_episodes.first),
-                      onToggleListened: () => _toggleListened(_episodes.first),
-                    ),
+              ),
+            ],
+          ),
+          if (_loading)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_error != null)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: _ErrorState(
+                message: _error!,
+                onRetry: _loadFirstPage,
+              ),
+            )
+          else if (_episodes.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: _EmptyState(),
+            )
+          else ...[
+            if (heroEpisode != null)
+              SliverToBoxAdapter(
+                child: ContinueListeningCard(
+                  episode: heroEpisode,
+                  allCompleted: groups.unfinished.isEmpty,
+                  isPlaying: playback.isEpisodePlaying(heroEpisode.id),
+                  isLoading: playback.loadingEpisodeId == heroEpisode.id,
+                  onPlay: () => _handleSmartPlay(heroEpisode),
+                  onToggleListened: () => _toggleListened(heroEpisode),
+                ),
+              ),
+            if (groups.inProgress.isNotEmpty) ...[
+              const SliverToBoxAdapter(
+                child: _SectionTitle(title: '進行中'),
+              ),
+              _EpisodeSliverList(
+                episodes: groups.inProgress,
+                playback: playback,
+                onPlay: (episode) => playback.toggle(episode),
+                onToggleListened: _toggleListened,
+              ),
+            ],
+            if (groups.unplayed.isNotEmpty) ...[
+              const SliverToBoxAdapter(
+                child: _SectionTitle(title: '未聽'),
+              ),
+              _EpisodeSliverList(
+                episodes: groups.unplayed,
+                playback: playback,
+                onPlay: (episode) => playback.toggle(episode),
+                onToggleListened: _toggleListened,
+              ),
+            ],
+            if (groups.completed.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: ListenedSectionHeader(
+                  count: groups.completed.length,
+                  expanded: _listenedExpanded,
+                  onTap: () => setState(
+                    () => _listenedExpanded = !_listenedExpanded,
                   ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Row(
-                        children: [
-                          Text(
-                            'Episodes',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontSize: 18),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(child: Divider()),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SliverList.builder(
-                    itemCount: _episodes.length - 1,
-                    itemBuilder: (context, index) {
-                      final episode = _episodes[index + 1];
-                      return EpisodeCard(
-                        episode: episode,
-                        isPlaying: playback.isEpisodePlaying(episode.id),
-                        isLoading: playback.loadingEpisodeId == episode.id,
-                        onPlay: () => playback.toggle(episode),
-                        onToggleListened: () => _toggleListened(episode),
-                      );
-                    },
-                  ),
-                  SliverToBoxAdapter(
-                    child: _LoadMoreStatus(
-                      loading: _loadingMore,
-                      error: _loadMoreError,
-                      hasMore: _nextCursor != null,
-                      onRetry: _loadMore,
-                    ),
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 108)),
-                ],
-              ],
+                ),
+              ),
+              if (_listenedExpanded)
+                _EpisodeSliverList(
+                  episodes: groups.completed,
+                  playback: playback,
+                  onPlay: (episode) => playback.toggle(episode),
+                  onToggleListened: _toggleListened,
+                ),
+            ],
+            SliverToBoxAdapter(
+              child: _LoadMoreStatus(
+                loading: _loadingMore,
+                error: _loadMoreError,
+                hasMore: _nextCursor != null,
+                onRetry: _loadMore,
+              ),
             ),
-          ),
-          const Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: MiniPlayer(),
-          ),
+            const SliverToBoxAdapter(child: SizedBox(height: 108)),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _handleSmartPlay(Episode heroEpisode) async {
+    final playback = context.read<PlaybackProvider>();
+    if (playback.currentEpisode?.id == heroEpisode.id) {
+      if (playback.isPlaying) {
+        await playback.pause();
+      } else {
+        await playback.resume();
+      }
+      return;
+    }
+
+    await playback.playSmart(_episodes);
+  }
+
+  _EpisodeGroups _groupByStatus(List<Episode> episodes) {
+    final inProgress = <Episode>[];
+    final unplayed = <Episode>[];
+    final completed = <Episode>[];
+
+    for (final episode in episodes) {
+      switch (episode.status) {
+        case EpisodeStatus.inProgress:
+          inProgress.add(episode);
+        case EpisodeStatus.unplayed:
+          unplayed.add(episode);
+        case EpisodeStatus.completed:
+          completed.add(episode);
+      }
+    }
+
+    return _EpisodeGroups(
+      inProgress: inProgress,
+      unplayed: unplayed,
+      completed: completed,
+    );
+  }
+
+  Episode? _heroEpisode(_EpisodeGroups groups) {
+    if (groups.inProgress.isNotEmpty) return groups.inProgress.first;
+    if (groups.unplayed.isNotEmpty) return groups.unplayed.last;
+    if (_episodes.isNotEmpty) return _episodes.last;
+    return null;
   }
 
   static String _avatarLabel(String? email) {
     final value = email?.trim();
     if (value == null || value.isEmpty) return 'F';
     return value.characters.first.toUpperCase();
+  }
+}
+
+class _EpisodeGroups {
+  const _EpisodeGroups({
+    required this.inProgress,
+    required this.unplayed,
+    required this.completed,
+  });
+
+  final List<Episode> inProgress;
+  final List<Episode> unplayed;
+  final List<Episode> completed;
+
+  List<Episode> get unfinished => [
+        ...inProgress,
+        ...unplayed,
+      ];
+}
+
+class _EpisodeSliverList extends StatelessWidget {
+  const _EpisodeSliverList({
+    required this.episodes,
+    required this.playback,
+    required this.onPlay,
+    required this.onToggleListened,
+  });
+
+  final List<Episode> episodes;
+  final PlaybackProvider playback;
+  final ValueChanged<Episode> onPlay;
+  final ValueChanged<Episode> onToggleListened;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverList.builder(
+      itemCount: episodes.length,
+      itemBuilder: (context, index) {
+        final episode = episodes[index];
+        return EpisodeCard(
+          episode: episode,
+          isPlaying: playback.isEpisodePlaying(episode.id),
+          isLoading: playback.loadingEpisodeId == episode.id,
+          onPlay: () => onPlay(episode),
+          onToggleListened: () => onToggleListened(episode),
+        );
+      },
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontSize: 18,
+                ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(child: Divider()),
+        ],
+      ),
+    );
   }
 }
 

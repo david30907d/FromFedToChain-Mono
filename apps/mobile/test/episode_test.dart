@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_podcast_mobile/models/episode.dart';
+import 'package:ai_podcast_mobile/models/episode_status.dart';
 
 void main() {
   group('Episode', () {
@@ -26,6 +27,27 @@ void main() {
       expect(episode.likeCount, 7);
       expect(episode.script, 'This is the script content');
       expect(episode.audioTracks, isEmpty);
+      expect(episode.lastPositionSeconds, 0);
+    });
+
+    test('fromJson maps last position from camel and snake case keys', () {
+      final camel = Episode.fromJson({
+        'id': 'uuid-camel-position',
+        'title': 'Camel Position Episode',
+        'hlsUrl': 'https://cdn.example.com/camel.m3u8',
+        'createdAt': '2024-01-07T12:00:00.000Z',
+        'lastPositionSeconds': 42,
+      });
+      final snake = Episode.fromJson({
+        'id': 'uuid-snake-position',
+        'title': 'Snake Position Episode',
+        'hls_url': 'https://cdn.example.com/snake.m3u8',
+        'created_at': '2024-01-08T12:00:00.000Z',
+        'last_position_seconds': '91',
+      });
+
+      expect(camel.lastPositionSeconds, 42);
+      expect(snake.lastPositionSeconds, 91);
     });
 
     test('fromJson maps camel case audio tracks', () {
@@ -169,6 +191,7 @@ void main() {
       expect(updated.likeCount, 2);
       expect(updated.script, 'New script');
       expect(updated.audioTracks, isEmpty);
+      expect(updated.lastPositionSeconds, 0);
     });
 
     test('copyWith preserves script when not provided', () {
@@ -212,6 +235,40 @@ void main() {
 
       expect(preserved.audioTracks, const [chineseTrack]);
       expect(overridden.audioTracks, const [englishTrack]);
+    });
+
+    test('copyWith overrides last position', () {
+      final original = Episode(
+        id: 'uuid-123',
+        title: 'Original',
+        hlsUrl: 'https://example.com/hls.m3u8',
+        createdAt: DateTime(2024, 1, 1),
+        listened: false,
+      );
+
+      final updated = original.copyWith(lastPositionSeconds: 37);
+
+      expect(updated.lastPositionSeconds, 37);
+    });
+
+    test('status is derived from listened and last position', () {
+      final base = Episode(
+        id: 'uuid-123',
+        title: 'Original',
+        hlsUrl: 'https://example.com/hls.m3u8',
+        createdAt: DateTime(2024, 1, 1),
+        listened: false,
+      );
+
+      expect(base.status, EpisodeStatus.unplayed);
+      expect(
+          base.copyWith(lastPositionSeconds: 5).status, EpisodeStatus.unplayed);
+      expect(base.copyWith(lastPositionSeconds: 6).status,
+          EpisodeStatus.inProgress);
+      expect(
+        base.copyWith(listened: true, lastPositionSeconds: 120).status,
+        EpisodeStatus.completed,
+      );
     });
   });
 }

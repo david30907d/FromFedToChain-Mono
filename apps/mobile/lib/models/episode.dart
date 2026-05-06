@@ -137,6 +137,7 @@ class Episode {
     this.script,
     this.audioTracks = const [],
     this.languageClassrooms = const [],
+    this.lastPositionSeconds = 0,
   }) : localizationId = localizationId ?? id;
 
   final String id;
@@ -150,6 +151,7 @@ class Episode {
   final String? script;
   final List<AudioTrack> audioTracks;
   final List<LanguageClassroomLesson> languageClassrooms;
+  final int lastPositionSeconds;
 
   List<AudioTrack> get playableAudioTracks {
     return audioTracks.where((track) => track.isPlayable).toList(
@@ -184,6 +186,8 @@ class Episode {
       script: json['script'] as String?,
       audioTracks: _readAudioTracks(json),
       languageClassrooms: _readLanguageClassrooms(json),
+      lastPositionSeconds:
+          _readInt(json, 'lastPositionSeconds', 'last_position_seconds'),
     );
   }
 
@@ -199,6 +203,7 @@ class Episode {
     String? script,
     List<AudioTrack>? audioTracks,
     List<LanguageClassroomLesson>? languageClassrooms,
+    int? lastPositionSeconds,
   }) {
     return Episode(
       id: id ?? this.id,
@@ -212,6 +217,7 @@ class Episode {
       script: script ?? this.script,
       audioTracks: audioTracks ?? this.audioTracks,
       languageClassrooms: languageClassrooms ?? this.languageClassrooms,
+      lastPositionSeconds: lastPositionSeconds ?? this.lastPositionSeconds,
     );
   }
 }
