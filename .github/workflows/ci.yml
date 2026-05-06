@@ -56,7 +56,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Test Coverage
-        run: pnpm test:coverage
+        run: pnpm --filter @from-fed-to-chain-mono/pipeline test:coverage
 
       - name: Test
         run: pnpm test
