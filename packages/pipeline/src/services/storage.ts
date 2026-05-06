@@ -30,8 +30,12 @@ function getPublicBase(): string {
   return publicBase;
 }
 
-export async function uploadHlsToR2(files: HlsFile[], episodeId: string): Promise<string> {
-  const prefix = `episodes/${episodeId}`;
+export async function uploadHlsToR2(
+  files: HlsFile[],
+  episodeId: string,
+  languageCode: string,
+): Promise<string> {
+  const prefix = `episodes/${languageCode}/${episodeId}`;
   const r2 = getR2Client();
   const Bucket = getBucket();
 

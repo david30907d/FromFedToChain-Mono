@@ -1,5 +1,6 @@
 import '../models/episode.dart';
 import '../models/episode_page.dart';
+import '../config/app_config.dart';
 import 'supabase_service.dart';
 
 class EpisodeService {
@@ -8,12 +9,19 @@ class EpisodeService {
 
   final SupabaseService _supabaseService;
 
-  Future<EpisodePage> getEpisodes({int limit = 20, String? cursor}) async {
+  Future<EpisodePage> getEpisodes({
+    int limit = 20,
+    String? cursor,
+    String languageCode = AppConfig.contentLanguageCode,
+  }) async {
     final offset = int.tryParse(cursor ?? '') ?? 0;
     final end = offset + limit;
     final rows = await _supabaseService.client
         .from('episodes_with_stats')
-        .select('id,title,hls_url,created_at,listened,script,like_count')
+        .select(
+          'id,title,language_code,hls_url,created_at,listened,script,like_count,language_classrooms',
+        )
+        .eq('language_code', languageCode)
         .order('created_at', ascending: false)
         .order('id', ascending: false)
         .range(offset, end);

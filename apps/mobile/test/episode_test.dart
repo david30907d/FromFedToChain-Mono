@@ -7,6 +7,7 @@ void main() {
       final json = {
         'id': 'uuid-123',
         'title': 'Test Episode',
+        'languageCode': 'zh-TW',
         'hlsUrl': 'https://cdn.example.com/episodes/uuid-123/playlist.m3u8',
         'createdAt': '2024-01-01T12:00:00.000Z',
         'listened': true,
@@ -18,6 +19,7 @@ void main() {
 
       expect(episode.id, 'uuid-123');
       expect(episode.title, 'Test Episode');
+      expect(episode.languageCode, 'zh-TW');
       expect(episode.hlsUrl,
           'https://cdn.example.com/episodes/uuid-123/playlist.m3u8');
       expect(episode.listened, true);
@@ -80,14 +82,44 @@ void main() {
       final episode = Episode.fromJson({
         'id': 'uuid-999',
         'title': 'Snake Case Episode',
+        'language_code': 'zh-TW',
         'hls_url': 'https://cdn.example.com/episode.m3u8',
         'created_at': '2024-01-04T12:00:00.000Z',
         'like_count': 12,
       });
 
       expect(episode.hlsUrl, 'https://cdn.example.com/episode.m3u8');
+      expect(episode.languageCode, 'zh-TW');
       expect(episode.likeCount, 12);
       expect(episode.listened, false);
+    });
+
+    test('fromJson maps language classrooms', () {
+      final episode = Episode.fromJson({
+        'id': 'uuid-classroom',
+        'title': 'Language Classroom Episode',
+        'hlsUrl': 'https://cdn.example.com/episode.m3u8',
+        'createdAt': '2024-01-04T12:00:00.000Z',
+        'languageClassrooms': [
+          {
+            'sourceLanguageCode': 'zh-TW',
+            'targetLanguageCode': 'ja-JP',
+            'oneLiner': 'この記事は市場流動性を説明します。',
+            'keywords': [
+              {
+                'term': '流動性',
+                'reading': 'りゅうどうせい',
+                'meaning': '資金容易進出市場的程度',
+                'note': '市場分析常用詞',
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(episode.languageClassrooms, hasLength(1));
+      expect(episode.languageClassrooms.single.targetLanguageCode, 'ja-JP');
+      expect(episode.languageClassrooms.single.keywords.single.term, '流動性');
     });
 
     test('fromJson handles null script', () {

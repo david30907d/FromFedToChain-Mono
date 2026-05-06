@@ -170,6 +170,23 @@ describe('generateScriptWithLLM', () => {
     expect(result.provider).toBe('unknown');
   });
 
+  it('returns unknown provider when API returns empty string provider', async () => {
+    const OpenAI = await import('openai');
+    const mockCreate = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: 'Script' } }],
+      provider: '',
+      model: 'test/model',
+    });
+
+    vi.mocked(OpenAI.default).mockImplementation(
+      () => createMockOpenAI(mockCreate) as unknown as OpenAI,
+    );
+
+    const result = await generateScriptWithLLM('Title', 'Text');
+
+    expect(result.provider).toBe('unknown');
+  });
+
   it('falls back to env model when API returns null model', async () => {
     vi.stubEnv('LLM_MODEL', 'fallback/model');
 
@@ -187,5 +204,22 @@ describe('generateScriptWithLLM', () => {
     const result = await generateScriptWithLLM('Title', 'Text');
 
     expect(result.model).toBe('fallback/model');
+  });
+
+  it('falls back to unknown when API returns empty string provider', async () => {
+    const OpenAI = await import('openai');
+    const mockCreate = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: 'Script' } }],
+      provider: '',
+      model: 'test/model',
+    });
+
+    vi.mocked(OpenAI.default).mockImplementation(
+      () => createMockOpenAI(mockCreate) as unknown as OpenAI,
+    );
+
+    const result = await generateScriptWithLLM('Title', 'Text');
+
+    expect(result.provider).toBe('unknown');
   });
 });

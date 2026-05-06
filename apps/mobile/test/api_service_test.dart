@@ -25,7 +25,9 @@ void main() {
 
     expect(
       requestedUrl,
-      Uri.parse('https://from-fed-to-chain-api.fly.dev/episodes?limit=20'),
+      Uri.parse(
+        'https://from-fed-to-chain-api.fly.dev/episodes?limit=20&language=zh-TW',
+      ),
     );
   });
 }

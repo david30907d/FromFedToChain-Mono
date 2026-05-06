@@ -45,9 +45,9 @@ describe('uploadHlsToR2', () => {
       },
     ];
 
-    const result = await uploadHlsToR2(files, 'test-id');
+    const result = await uploadHlsToR2(files, 'test-id', 'zh-TW');
 
-    expect(result).toBe('https://cdn.example.com/episodes/test-id/playlist.m3u8');
+    expect(result).toBe('https://cdn.example.com/episodes/zh-TW/test-id/playlist.m3u8');
     expect(mockSend).toHaveBeenCalled();
   });
 });

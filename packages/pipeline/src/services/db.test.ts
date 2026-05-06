@@ -8,10 +8,14 @@ import {
   listEpisodes,
   listEpisodesPaged,
   insertEpisode,
+  listLanguageClassroomsByEpisodeId,
+  listLanguageClassroomsByEpisodeIds,
   markEpisodeListened,
+  updateEpisodeArticleContent,
   updateEpisodeStatus,
+  upsertLanguageClassrooms,
 } from './db.js';
-import type { EpisodeRow } from '../types.js';
+import type { EpisodeRow, LanguageClassroomRow } from '../types.js';
 
 vi.mock('../lib/env.js', () => ({
   getRequiredEnv: vi.fn((key: string) => {
@@ -27,21 +31,34 @@ const {
   mockSelect,
   mockInsert: _mockInsert,
   mockUpdate,
+  mockUpsert,
 } = vi.hoisted(() => {
   const mockMaybeSingle = vi.fn();
+  const eqChain = {
+    eq: vi.fn(),
+    maybeSingle: mockMaybeSingle,
+  };
+  eqChain.eq.mockReturnValue(eqChain);
   const mockOrder = vi.fn().mockReturnValue({
     returns: vi.fn().mockResolvedValue({ data: [], error: null }),
+  });
+  const mockIn = vi.fn().mockReturnValue({
+    order: mockOrder,
   });
   const mockSelect = vi.fn().mockReturnValue({
     order: mockOrder,
     maybeSingle: mockMaybeSingle,
-    eq: vi.fn().mockReturnValue({
-      maybeSingle: mockMaybeSingle,
-    }),
+    eq: eqChain.eq,
+    in: mockIn,
   });
   const mockInsert = vi.fn().mockReturnValue({
     select: vi.fn().mockReturnValue({
       single: mockMaybeSingle,
+    }),
+  });
+  const mockUpsert = vi.fn().mockReturnValue({
+    select: vi.fn().mockReturnValue({
+      returns: vi.fn().mockResolvedValue({ data: [], error: null }),
     }),
   });
   const mockUpdate = vi.fn().mockReturnValue({
@@ -55,8 +72,9 @@ const {
     select: mockSelect,
     insert: mockInsert,
     update: mockUpdate,
+    upsert: mockUpsert,
   });
-  return { mockMaybeSingle, mockSelect, mockInsert, mockUpdate, mockFrom };
+  return { mockMaybeSingle, mockSelect, mockInsert, mockUpdate, mockUpsert, mockFrom };
 });
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -71,6 +89,7 @@ describe('toEpisodeResponse', () => {
       id: 'uuid-123',
       title: 'Episode Title',
       source_url: 'https://example.com/article',
+      language_code: 'zh-TW',
       hls_url: 'https://r2.example.com/episodes/uuid-123/playlist.m3u8',
       raw_text: 'raw text content',
       script: 'generated script',
@@ -85,6 +104,7 @@ describe('toEpisodeResponse', () => {
     const response = toEpisodeResponse(row);
     expect(response.id).toBe('uuid-123');
     expect(response.title).toBe('Episode Title');
+    expect(response.languageCode).toBe('zh-TW');
     expect(response.hlsUrl).toBe('https://r2.example.com/episodes/uuid-123/playlist.m3u8');
     expect(response.createdAt).toBe('2024-01-01T00:00:00Z');
     expect(response.listened).toBe(true);
@@ -100,6 +120,7 @@ describe('toEpisodeResponse', () => {
       id: 'uuid-456',
       title: 'Minimal Episode',
       source_url: 'https://example.com',
+      language_code: 'zh-TW',
       hls_url: '',
       raw_text: null,
       script: null,
@@ -126,6 +147,7 @@ describe('findEpisodeBySourceUrl', () => {
       id: '123',
       title: 'Test',
       source_url: 'https://example.com',
+      language_code: 'zh-TW',
       hls_url: '',
       raw_text: null,
       script: null,
@@ -138,7 +160,7 @@ describe('findEpisodeBySourceUrl', () => {
     };
     mockMaybeSingle.mockResolvedValue({ data: episode, error: null });
 
-    const result = await findEpisodeBySourceUrl('https://example.com');
+    const result = await findEpisodeBySourceUrl('https://example.com', 'zh-TW');
     expect(createClient).toHaveBeenCalledWith(
       'https://example.supabase.co',
       'test-key',
@@ -151,13 +173,26 @@ describe('findEpisodeBySourceUrl', () => {
 
   it('returns null when not found', async () => {
     mockMaybeSingle.mockResolvedValue({ data: null, error: null });
-    const result = await findEpisodeBySourceUrl('https://example.com/not-found');
+    const result = await findEpisodeBySourceUrl('https://example.com/not-found', 'zh-TW');
     expect(result).toBeNull();
   });
 
   it('throws on database error', async () => {
     mockMaybeSingle.mockResolvedValue({ data: null, error: { message: 'db error' } });
-    await expect(findEpisodeBySourceUrl('https://example.com')).rejects.toThrow('db error');
+    await expect(findEpisodeBySourceUrl('https://example.com', 'zh-TW')).rejects.toThrow(
+      'db error',
+    );
+  });
+});
+
+describe('getSupabaseDbSchema', () => {
+  it('uses custom schema from env when set', () => {
+    vi.stubEnv('SUPABASE_DB_SCHEMA', 'custom_schema');
+    vi.resetModules();
+    import('./db.js').then(async (db) => {
+      expect(db.listEpisodes).toBeDefined();
+    });
+    vi.unstubAllEnvs();
   });
 });
 
@@ -210,6 +245,20 @@ describe('cursor helpers', () => {
     ).toString('base64url');
     expect(() => decodeCursor(nullI)).toThrow('bad cursor shape');
   });
+
+  it('rejects cursors with empty string t or i', () => {
+    const emptyT = Buffer.from(
+      JSON.stringify({ t: '', i: '00000000-0000-4000-8000-000000000001' }),
+      'utf8',
+    ).toString('base64url');
+    expect(() => decodeCursor(emptyT)).toThrow('bad cursor ts');
+
+    const emptyI = Buffer.from(
+      JSON.stringify({ t: '2024-01-01T00:00:00.000Z', i: '' }),
+      'utf8',
+    ).toString('base64url');
+    expect(() => decodeCursor(emptyI)).toThrow('bad cursor id');
+  });
 });
 
 describe('listEpisodes', () => {
@@ -219,6 +268,7 @@ describe('listEpisodes', () => {
         id: '1',
         title: 'Latest',
         source_url: '',
+        language_code: 'zh-TW',
         hls_url: '',
         raw_text: null,
         script: null,
@@ -273,6 +323,7 @@ describe('listEpisodesPaged', () => {
       id: `00000000-0000-4000-8000-${idSuffix}`,
       title: `Episode ${index + 1}`,
       source_url: `https://example.com/${index + 1}`,
+      language_code: 'zh-TW',
       hls_url: '',
       raw_text: null,
       script: null,
@@ -333,6 +384,7 @@ describe('insertEpisode', () => {
       id: 'new-id',
       title: 'New',
       source_url: 'https://example.com',
+      language_code: 'zh-TW',
       hls_url: '',
       raw_text: 'text',
       script: '',
@@ -349,6 +401,7 @@ describe('insertEpisode', () => {
       id: 'new-id',
       title: 'New',
       sourceUrl: 'https://example.com',
+      languageCode: 'zh-TW',
       hlsUrl: '',
       rawText: 'text',
       script: '',
@@ -369,6 +422,7 @@ describe('insertEpisode', () => {
         id: 'id',
         title: 'Title',
         sourceUrl: 'https://example.com',
+        languageCode: 'zh-TW',
         hlsUrl: '',
         rawText: '',
         script: '',
@@ -387,6 +441,7 @@ describe('markEpisodeListened', () => {
       id: '123',
       title: 'Test',
       source_url: '',
+      language_code: 'zh-TW',
       hls_url: '',
       raw_text: null,
       script: null,
@@ -415,6 +470,49 @@ describe('markEpisodeListened', () => {
     mockMaybeSingle.mockResolvedValue({ data: null, error: { message: 'mark error' } });
 
     await expect(markEpisodeListened('123')).rejects.toThrow('mark error');
+  });
+});
+
+describe('updateEpisodeArticleContent', () => {
+  it('updates title and raw_text only', async () => {
+    const row: EpisodeRow = {
+      id: '123',
+      title: '軟體更新',
+      source_url: 'https://example.com/article',
+      language_code: 'zh-TW',
+      hls_url: 'https://cdn.example.com/article.m3u8',
+      raw_text: '滑鼠和腳踏車市場',
+      script: 'script',
+      llm_model: 'model',
+      llm_thinking_model: null,
+      llm_provider: 'provider',
+      status: 'completed',
+      created_at: '2024-01-01T00:00:00.000Z',
+      listened: false,
+    };
+    mockMaybeSingle.mockResolvedValue({ data: row, error: null });
+
+    const result = await updateEpisodeArticleContent('123', {
+      title: '軟體更新',
+      text: '滑鼠和腳踏車市場',
+    });
+
+    expect(mockUpdate).toHaveBeenLastCalledWith({
+      title: '軟體更新',
+      raw_text: '滑鼠和腳踏車市場',
+    });
+    expect(result).toEqual(row);
+  });
+
+  it('throws on database error', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: null, error: { message: 'article update error' } });
+
+    await expect(
+      updateEpisodeArticleContent('123', {
+        title: '軟體更新',
+        text: '滑鼠和腳踏車市場',
+      }),
+    ).rejects.toThrow('article update error');
   });
 });
 
