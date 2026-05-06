@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/episode.dart';
+import '../models/episode_page.dart';
 import '../services/episode_service.dart';
 import '../state/auth_provider.dart';
 import '../state/likes_provider.dart';
@@ -67,16 +68,15 @@ class _FeedScreenState extends State<FeedScreen> {
     });
 
     try {
-      final page = await _episodeService.getEpisodes(limit: 20);
-      final hydrated = await _applyUserState(page.items);
+      final page = await _loadPage();
       if (!mounted || epoch != _requestEpoch) return;
 
       setState(() {
-        _episodes = hydrated;
+        _episodes = page.items;
         _nextCursor = page.nextCursor;
         _loading = false;
       });
-      context.read<LikesProvider>().seedEpisodes(hydrated);
+      context.read<LikesProvider>().seedEpisodes(page.items);
     } catch (error) {
       if (!mounted || epoch != _requestEpoch) return;
       setState(() {
@@ -96,15 +96,11 @@ class _FeedScreenState extends State<FeedScreen> {
     });
 
     try {
-      final page = await _episodeService.getEpisodes(
-        limit: 20,
-        cursor: _nextCursor,
-      );
-      final hydrated = await _applyUserState(page.items);
+      final page = await _loadPage(cursor: _nextCursor);
       if (!mounted || epoch != _requestEpoch) return;
 
       setState(() {
-        _episodes = [..._episodes, ...hydrated];
+        _episodes = [..._episodes, ...page.items];
         _nextCursor = page.nextCursor;
         _loadingMore = false;
       });
@@ -116,6 +112,19 @@ class _FeedScreenState extends State<FeedScreen> {
         _loadMoreError = error.toString();
       });
     }
+  }
+
+  Future<EpisodePage> _loadPage({String? cursor}) async {
+    final page = await _episodeService.getEpisodes(
+      limit: 20,
+      cursor: cursor,
+    );
+    final hydrated = await _applyUserState(page.items);
+
+    return EpisodePage(
+      items: hydrated,
+      nextCursor: page.nextCursor,
+    );
   }
 
   Future<List<Episode>> _applyUserState(List<Episode> episodes) async {

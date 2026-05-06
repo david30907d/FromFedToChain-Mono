@@ -6,6 +6,6 @@
     "lint": "dart analyze .",
     "format": "dart format .",
     "format:check": "dart format --set-exit-if-changed .",
-    "dup:check": "npx jscpd lib/ --threshold 5 --formats-exts dart:dart"
+    "dup:check": "pnpm --dir ../.. exec jscpd apps/mobile/lib/ --config .jscpd.json --formats-exts dart:dart"
   }
 }

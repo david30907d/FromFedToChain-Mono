@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/jscpd.json",
+  "threshold": 0,
+  "reporters": ["console", "json"],
+  "output": ".jscpd-report",
+  "ignore": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/__tests__/**",
+    "**/coverage/**",
+    "**/.turbo/**"
+  ],
+  "gitignore": true,
+  "minLines": 5,
+  "minTokens": 50,
+  "exitCode": 1,
+  "mode": "strict"
+}

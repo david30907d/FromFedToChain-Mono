@@ -7,8 +7,9 @@ import '../models/episode.dart';
 import '../state/auth_provider.dart';
 import '../state/playback_provider.dart';
 import '../theme/colors.dart';
-import '../utils/date_format.dart';
+import '../widgets/episode_hero_frame.dart';
 import '../widgets/like_button.dart';
+import '../widgets/played_button.dart';
 import '../widgets/playback_speed_menu.dart';
 import '../widgets/share_button.dart';
 
@@ -185,84 +186,15 @@ class _EpisodeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+    return EpisodeHeroFrame(
       height: 220,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF5A291B),
-            Color(0xFF251916),
-            AppColors.surface,
-          ],
-          stops: [0, 0.48, 1],
-        ),
-        border: Border.all(color: const Color(0xFF4B2B21)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.accent.withValues(alpha: 0.12),
-            blurRadius: 36,
-            offset: const Offset(0, 18),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -14,
-            top: 24,
-            child: Icon(
-              Icons.graphic_eq_rounded,
-              size: 100,
-              color: AppColors.accent.withValues(alpha: 0.10),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'LATEST',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '-',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        formatEpisodeDate(episode.createdAt),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                Text(
-                  episode.title,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.headlineLarge,
-                ),
-              ],
-            ),
-          ),
-        ],
+      iconRight: -14,
+      iconTop: 24,
+      iconSize: 100,
+      iconOpacity: 0.10,
+      child: EpisodeHeroText(
+        episode: episode,
+        showDateSeparator: true,
       ),
     );
   }
@@ -563,7 +495,7 @@ class _ActionRow extends StatelessWidget {
       children: [
         LikeButton(episode: episode),
         ShareButton(episode: episode),
-        _PlayedButton(
+        PlayedButton(
           listened: episode.listened,
           onPressed: onToggleListened,
         ),
@@ -608,35 +540,6 @@ class _TranscriptSection extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _PlayedButton extends StatelessWidget {
-  const _PlayedButton({
-    required this.listened,
-    required this.onPressed,
-  });
-
-  final bool listened;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(
-        listened ? Icons.check_circle_rounded : Icons.check_circle_outline,
-        size: 19,
-        color: listened ? AppColors.success : AppColors.textSecondary,
-      ),
-      label: Text(listened ? 'Played' : 'Mark played'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: listened ? AppColors.success : AppColors.textPrimary,
-        side: BorderSide(
-          color: listened ? AppColors.success : AppColors.divider,
-        ),
-      ),
     );
   }
 }

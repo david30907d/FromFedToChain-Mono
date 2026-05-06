@@ -9,6 +9,12 @@ import '../models/episode.dart';
 class PodcastAudioHandler extends BaseAudioHandler with SeekHandler {
   final AudioPlayer _player = AudioPlayer();
   late final Future<void> _ready;
+  static const Set<MediaAction> _seekActions = {
+    MediaAction.seek,
+    MediaAction.seekForward,
+    MediaAction.seekBackward,
+  };
+  static const List<int> _compactActionIndices = [0, 1, 2];
 
   PodcastAudioHandler() {
     _ready = _init();
@@ -59,18 +65,9 @@ class PodcastAudioHandler extends BaseAudioHandler with SeekHandler {
     ));
 
     playbackState.add(PlaybackState(
-      controls: [
-        MediaControl.rewind,
-        MediaControl.play,
-        MediaControl.fastForward,
-        MediaControl.stop,
-      ],
-      systemActions: const {
-        MediaAction.seek,
-        MediaAction.seekForward,
-        MediaAction.seekBackward,
-      },
-      androidCompactActionIndices: const [0, 1, 2],
+      controls: _controlsFor(playing: false),
+      systemActions: _seekActions,
+      androidCompactActionIndices: _compactActionIndices,
       processingState: AudioProcessingState.idle,
       playing: false,
       updatePosition: Duration.zero,
@@ -173,15 +170,9 @@ class PodcastAudioHandler extends BaseAudioHandler with SeekHandler {
     mediaItem.add(newMediaItem);
 
     try {
-      await _player.setAudioSource(
-        AudioSource.uri(Uri.parse(url)),
-      );
+      await _setSourceUrl(url);
     } catch (_) {
-      playbackState.add(
-        playbackState.value.copyWith(
-          processingState: AudioProcessingState.error,
-        ),
-      );
+      _markPlaybackError();
       rethrow;
     }
   }
@@ -200,9 +191,7 @@ class PodcastAudioHandler extends BaseAudioHandler with SeekHandler {
     ));
 
     try {
-      final duration = await _player.setAudioSource(
-        AudioSource.uri(Uri.parse(track.hlsUrl)),
-      );
+      final duration = await _setSourceUrl(track.hlsUrl);
       final seekPosition = duration != null && previousPosition > duration
           ? duration
           : previousPosition;
@@ -216,11 +205,7 @@ class PodcastAudioHandler extends BaseAudioHandler with SeekHandler {
         await _player.play();
       }
     } catch (_) {
-      playbackState.add(
-        playbackState.value.copyWith(
-          processingState: AudioProcessingState.error,
-        ),
-      );
+      _markPlaybackError();
       rethrow;
     }
   }
@@ -248,18 +233,9 @@ class PodcastAudioHandler extends BaseAudioHandler with SeekHandler {
     final playing = _player.playing;
 
     playbackState.add(playbackState.value.copyWith(
-      controls: [
-        MediaControl.rewind,
-        if (playing) MediaControl.pause else MediaControl.play,
-        MediaControl.fastForward,
-        MediaControl.stop,
-      ],
-      systemActions: const {
-        MediaAction.seek,
-        MediaAction.seekForward,
-        MediaAction.seekBackward,
-      },
-      androidCompactActionIndices: const [0, 1, 2],
+      controls: _controlsFor(playing: playing),
+      systemActions: _seekActions,
+      androidCompactActionIndices: _compactActionIndices,
       processingState: _mapProcessingState(_player.processingState),
       playing: playing,
       updatePosition: _player.position,
@@ -267,6 +243,27 @@ class PodcastAudioHandler extends BaseAudioHandler with SeekHandler {
       speed: _player.speed,
       queueIndex: 0,
     ));
+  }
+
+  List<MediaControl> _controlsFor({required bool playing}) {
+    return [
+      MediaControl.rewind,
+      playing ? MediaControl.pause : MediaControl.play,
+      MediaControl.fastForward,
+      MediaControl.stop,
+    ];
+  }
+
+  Future<Duration?> _setSourceUrl(String url) {
+    return _player.setAudioSource(AudioSource.uri(Uri.parse(url)));
+  }
+
+  void _markPlaybackError() {
+    playbackState.add(
+      playbackState.value.copyWith(
+        processingState: AudioProcessingState.error,
+      ),
+    );
   }
 
   Future<void> dispose() async {

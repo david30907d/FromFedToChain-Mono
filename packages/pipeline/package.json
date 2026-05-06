@@ -16,7 +16,7 @@
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write \"src/**/*.ts\" \"*.config.*\" \"*.json\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"*.config.*\" \"*.json\"",
-    "dup:check": "jscpd src/ --threshold 5"
+    "dup:check": "pnpm --dir ../.. exec jscpd packages/pipeline/src/ --config .jscpd.json"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.940.0",
@@ -38,7 +38,6 @@
     "@types/node": "^24.10.1",
     "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9.28.0",
-    "jscpd": "^4.0.5",
     "prettier": "^3.8.3",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

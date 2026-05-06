@@ -24,4 +24,4 @@ coverage/
 # Lint / Quality
 .eslintcache
 .jscpd-report/
-
+**/report/jscpd-report.json

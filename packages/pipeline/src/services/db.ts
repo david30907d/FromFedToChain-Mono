@@ -160,10 +160,13 @@ export async function insertEpisode(episode: NewEpisode): Promise<EpisodeRow> {
   return data;
 }
 
-export async function markEpisodeListened(id: string): Promise<EpisodeRow | null> {
+async function updateEpisodeFields(
+  id: string,
+  fields: Record<string, unknown>,
+): Promise<EpisodeRow | null> {
   const { data, error } = await getSupabase()
     .from('episodes')
-    .update({ listened: true })
+    .update(fields)
     .eq('id', id)
     .select('*')
     .maybeSingle<EpisodeRow>();
@@ -173,6 +176,10 @@ export async function markEpisodeListened(id: string): Promise<EpisodeRow | null
   }
 
   return data;
+}
+
+export async function markEpisodeListened(id: string): Promise<EpisodeRow | null> {
+  return updateEpisodeFields(id, { listened: true });
 }
 
 export async function updateEpisodeStatus(
@@ -190,16 +197,5 @@ export async function updateEpisodeStatus(
   if (updates?.llmProvider !== undefined) setFields.llm_provider = updates.llmProvider;
   if (updates?.hlsUrl !== undefined) setFields.hls_url = updates.hlsUrl;
 
-  const { data, error } = await getSupabase()
-    .from('episodes')
-    .update(setFields)
-    .eq('id', id)
-    .select('*')
-    .maybeSingle<EpisodeRow>();
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
+  return updateEpisodeFields(id, setFields);
 }
