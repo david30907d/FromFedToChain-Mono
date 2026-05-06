@@ -128,6 +128,20 @@ void main() {
     expect(find.text('EN'), findsNothing);
     expect(find.text('日本語'), findsNothing);
   });
+
+  testWidgets('Episode detail shows language classroom lessons',
+      (tester) async {
+    await _pumpHarness(
+      tester,
+      EpisodeDetailScreen(episode: _episodeWithLanguageClassroom()),
+    );
+
+    expect(find.text('Language Classroom'), findsOneWidget);
+    expect(find.text('JP'), findsOneWidget);
+    expect(find.text('この記事は市場流動性を説明します。'), findsOneWidget);
+    expect(find.text('流動性'), findsOneWidget);
+    expect(find.textContaining('資金容易進出市場的程度'), findsOneWidget);
+  });
 }
 
 Future<void> _pumpHarness(
@@ -190,5 +204,25 @@ Episode _episode({
     listened: false,
     likeCount: 123,
     script: script,
+  );
+}
+
+Episode _episodeWithLanguageClassroom() {
+  return _episode().copyWith(
+    languageClassrooms: const [
+      LanguageClassroomLesson(
+        sourceLanguageCode: 'zh-Hant',
+        targetLanguageCode: 'ja',
+        oneLiner: 'この記事は市場流動性を説明します。',
+        keywords: [
+          LanguageClassroomKeyword(
+            term: '流動性',
+            reading: 'りゅうどうせい',
+            meaning: '資金容易進出市場的程度',
+            note: '市場分析常用詞',
+          ),
+        ],
+      ),
+    ],
   );
 }

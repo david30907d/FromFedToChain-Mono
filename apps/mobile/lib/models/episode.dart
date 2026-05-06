@@ -39,26 +39,117 @@ class AudioTrack {
   int get hashCode => Object.hash(languageCode, title, hlsUrl);
 }
 
+class LanguageClassroomKeyword {
+  const LanguageClassroomKeyword({
+    required this.term,
+    required this.meaning,
+    this.reading,
+    this.note,
+  });
+
+  final String term;
+  final String? reading;
+  final String meaning;
+  final String? note;
+
+  factory LanguageClassroomKeyword.fromJson(Map<String, dynamic> json) {
+    return LanguageClassroomKeyword(
+      term: _readRequiredString(json, 'term', 'term'),
+      reading: _readNullableString(json, 'reading', 'reading'),
+      meaning: _readRequiredString(json, 'meaning', 'meaning'),
+      note: _readNullableString(json, 'note', 'note'),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is LanguageClassroomKeyword &&
+            other.term == term &&
+            other.reading == reading &&
+            other.meaning == meaning &&
+            other.note == note;
+  }
+
+  @override
+  int get hashCode => Object.hash(term, reading, meaning, note);
+}
+
+class LanguageClassroomLesson {
+  const LanguageClassroomLesson({
+    required this.sourceLanguageCode,
+    required this.targetLanguageCode,
+    required this.oneLiner,
+    required this.keywords,
+  });
+
+  final String sourceLanguageCode;
+  final String targetLanguageCode;
+  final String oneLiner;
+  final List<LanguageClassroomKeyword> keywords;
+
+  factory LanguageClassroomLesson.fromJson(Map<String, dynamic> json) {
+    return LanguageClassroomLesson(
+      sourceLanguageCode: _readOptionalString(
+        json,
+        'sourceLanguageCode',
+        'source_language_code',
+      ),
+      targetLanguageCode: _readRequiredString(
+        json,
+        'targetLanguageCode',
+        'target_language_code',
+      ),
+      oneLiner: _readRequiredString(json, 'oneLiner', 'one_liner'),
+      keywords: _readLanguageClassroomKeywords(json),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is LanguageClassroomLesson &&
+            other.sourceLanguageCode == sourceLanguageCode &&
+            other.targetLanguageCode == targetLanguageCode &&
+            other.oneLiner == oneLiner &&
+            _listEquals(other.keywords, keywords);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        sourceLanguageCode,
+        targetLanguageCode,
+        oneLiner,
+        Object.hashAll(keywords),
+      );
+}
+
 class Episode {
   const Episode({
     required this.id,
+    String? localizationId,
     required this.title,
+    this.languageCode = 'zh-Hant',
     required this.hlsUrl,
     required this.createdAt,
     required this.listened,
     this.likeCount = 0,
     this.script,
     this.audioTracks = const [],
-  });
+    this.languageClassrooms = const [],
+  }) : localizationId = localizationId ?? id;
 
   final String id;
+  final String localizationId;
   final String title;
+  final String languageCode;
   final String hlsUrl;
   final DateTime createdAt;
   final bool listened;
   final int likeCount;
   final String? script;
   final List<AudioTrack> audioTracks;
+  final List<LanguageClassroomLesson> languageClassrooms;
 
   List<AudioTrack> get playableAudioTracks {
     return audioTracks.where((track) => track.isPlayable).toList(
@@ -67,9 +158,23 @@ class Episode {
   }
 
   factory Episode.fromJson(Map<String, dynamic> json) {
+    final id = json['id'] as String;
+    final localizationId = _readOptionalString(
+      json,
+      'localizationId',
+      'localization_id',
+    );
+    final languageCode = _readOptionalString(
+      json,
+      'languageCode',
+      'language_code',
+    );
+
     return Episode(
-      id: json['id'] as String,
+      id: id,
+      localizationId: localizationId.isNotEmpty ? localizationId : id,
       title: json['title'] as String,
+      languageCode: languageCode.isNotEmpty ? languageCode : 'zh-Hant',
       hlsUrl: _readRequiredString(json, 'hlsUrl', 'hls_url'),
       createdAt: DateTime.parse(
         _readRequiredString(json, 'createdAt', 'created_at'),
@@ -78,28 +183,35 @@ class Episode {
       likeCount: _readInt(json, 'likeCount', 'like_count'),
       script: json['script'] as String?,
       audioTracks: _readAudioTracks(json),
+      languageClassrooms: _readLanguageClassrooms(json),
     );
   }
 
   Episode copyWith({
     String? id,
+    String? localizationId,
     String? title,
+    String? languageCode,
     String? hlsUrl,
     DateTime? createdAt,
     bool? listened,
     int? likeCount,
     String? script,
     List<AudioTrack>? audioTracks,
+    List<LanguageClassroomLesson>? languageClassrooms,
   }) {
     return Episode(
       id: id ?? this.id,
+      localizationId: localizationId ?? this.localizationId,
       title: title ?? this.title,
+      languageCode: languageCode ?? this.languageCode,
       hlsUrl: hlsUrl ?? this.hlsUrl,
       createdAt: createdAt ?? this.createdAt,
       listened: listened ?? this.listened,
       likeCount: likeCount ?? this.likeCount,
       script: script ?? this.script,
       audioTracks: audioTracks ?? this.audioTracks,
+      languageClassrooms: languageClassrooms ?? this.languageClassrooms,
     );
   }
 }
@@ -118,6 +230,15 @@ String _readOptionalString(
   String snakeKey,
 ) {
   return (json[camelKey] ?? json[snakeKey])?.toString() ?? '';
+}
+
+String? _readNullableString(
+  Map<String, dynamic> json,
+  String camelKey,
+  String snakeKey,
+) {
+  final value = _readOptionalString(json, camelKey, snakeKey).trim();
+  return value.isEmpty ? null : value;
 }
 
 int _readInt(
@@ -140,4 +261,47 @@ List<AudioTrack> _readAudioTracks(Map<String, dynamic> json) {
       .map((track) => AudioTrack.fromJson(Map<String, dynamic>.from(track)))
       .where((track) => track.isPlayable)
       .toList(growable: false);
+}
+
+List<LanguageClassroomLesson> _readLanguageClassrooms(
+  Map<String, dynamic> json,
+) {
+  final value = json['languageClassrooms'] ?? json['language_classrooms'];
+  if (value is! List) return const [];
+
+  return value
+      .whereType<Map>()
+      .map(
+        (lesson) => LanguageClassroomLesson.fromJson(
+          Map<String, dynamic>.from(lesson),
+        ),
+      )
+      .where((lesson) => lesson.oneLiner.trim().isNotEmpty)
+      .toList(growable: false);
+}
+
+List<LanguageClassroomKeyword> _readLanguageClassroomKeywords(
+  Map<String, dynamic> json,
+) {
+  final value = json['keywords'];
+  if (value is! List) return const [];
+
+  return value
+      .whereType<Map>()
+      .map(
+        (keyword) => LanguageClassroomKeyword.fromJson(
+          Map<String, dynamic>.from(keyword),
+        ),
+      )
+      .where((keyword) => keyword.term.trim().isNotEmpty)
+      .toList(growable: false);
+}
+
+bool _listEquals<T>(List<T> left, List<T> right) {
+  if (identical(left, right)) return true;
+  if (left.length != right.length) return false;
+  for (var index = 0; index < left.length; index += 1) {
+    if (left[index] != right[index]) return false;
+  }
+  return true;
 }

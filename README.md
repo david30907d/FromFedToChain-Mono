@@ -25,6 +25,11 @@ set to that value unless you intentionally create a separate environment.
 Supabase Data API must also expose `from_fed_to_chain` in API settings, or via
 the `authenticator` role `pgrst.db_schemas` setting.
 
+For an existing database, apply pending SQL files under
+`packages/pipeline/supabase/migrations` in numeric order instead of rerunning
+`schema.sql`. The schema file is the fresh-install snapshot; migrations are the
+incremental upgrade path.
+
 ## Run
 
 Pipeline:

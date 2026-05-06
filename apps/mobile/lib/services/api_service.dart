@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../config/app_config.dart';
 import '../models/episode.dart';
 import '../models/episode_page.dart';
 
@@ -18,9 +19,14 @@ class ApiService {
   final Uri _baseUri;
   final http.Client _client;
 
-  Future<EpisodePage> getEpisodes({int limit = 20, String? cursor}) async {
+  Future<EpisodePage> getEpisodes({
+    int limit = 20,
+    String? cursor,
+    String languageCode = AppConfig.contentLanguageCode,
+  }) async {
     final queryParameters = <String, String>{
       'limit': '$limit',
+      'language': languageCode,
       if (cursor != null) 'cursor': cursor,
     };
     final response = await _client.get(

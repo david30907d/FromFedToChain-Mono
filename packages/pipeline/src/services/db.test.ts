@@ -1,17 +1,21 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import {
-  toEpisodeResponse,
   decodeCursor,
   encodeCursor,
   findEpisodeBySourceUrl,
-  listEpisodes,
-  listEpisodesPaged,
+  findEpisodeLocalizationByEpisodeId,
   insertEpisode,
+  insertEpisodeLocalization,
+  listEpisodesPaged,
+  listLanguageClassroomsByLocalizationIds,
   markEpisodeListened,
-  updateEpisodeStatus,
+  toEpisodeResponse,
+  updateEpisodeLocalizationArticleContent,
+  updateEpisodeLocalizationStatus,
+  upsertLanguageClassrooms,
 } from './db.js';
-import type { EpisodeRow } from '../types.js';
+import type { EpisodeListRow, EpisodeLocalizationRow, EpisodeRow } from '../types.js';
 
 vi.mock('../lib/env.js', () => ({
   getRequiredEnv: vi.fn((key: string) => {
@@ -21,43 +25,32 @@ vi.mock('../lib/env.js', () => ({
   }),
 }));
 
-const {
-  mockMaybeSingle,
-  mockFrom,
-  mockSelect,
-  mockInsert: _mockInsert,
-  mockUpdate,
-} = vi.hoisted(() => {
-  const mockMaybeSingle = vi.fn();
-  const mockOrder = vi.fn().mockReturnValue({
-    returns: vi.fn().mockResolvedValue({ data: [], error: null }),
-  });
-  const mockSelect = vi.fn().mockReturnValue({
-    order: mockOrder,
-    maybeSingle: mockMaybeSingle,
-    eq: vi.fn().mockReturnValue({
-      maybeSingle: mockMaybeSingle,
-    }),
-  });
-  const mockInsert = vi.fn().mockReturnValue({
-    select: vi.fn().mockReturnValue({
-      single: mockMaybeSingle,
-    }),
-  });
-  const mockUpdate = vi.fn().mockReturnValue({
-    eq: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        maybeSingle: mockMaybeSingle,
-      }),
-    }),
-  });
-  const mockFrom = vi.fn().mockReturnValue({
-    select: mockSelect,
-    insert: mockInsert,
-    update: mockUpdate,
-  });
-  return { mockMaybeSingle, mockSelect, mockInsert, mockUpdate, mockFrom };
+const { state, mockFrom } = vi.hoisted(() => {
+  const state: { query: ReturnType<typeof makeQuery> | null } = { query: null };
+  const mockFrom = vi.fn(() => state.query);
+  return { state, mockFrom };
 });
+
+function makeQuery() {
+  const query = {
+    select: vi.fn(() => query),
+    eq: vi.fn(() => query),
+    in: vi.fn(() => query),
+    order: vi.fn(() => query),
+    limit: vi.fn(() => query),
+    or: vi.fn(() => query),
+    insert: vi.fn(() => query),
+    upsert: vi.fn(() => query),
+    update: vi.fn(() => query),
+    single: vi.fn(),
+    maybeSingle: vi.fn(),
+    returns: vi.fn(),
+  };
+  query.returns.mockResolvedValue({ data: [], error: null });
+  query.single.mockResolvedValue({ data: null, error: null });
+  query.maybeSingle.mockResolvedValue({ data: null, error: null });
+  return query;
+}
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
@@ -65,80 +58,72 @@ vi.mock('@supabase/supabase-js', () => ({
   })),
 }));
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  state.query = makeQuery();
+});
+
 describe('toEpisodeResponse', () => {
-  it('maps all row fields correctly', () => {
-    const row: EpisodeRow = {
-      id: 'uuid-123',
-      title: 'Episode Title',
-      source_url: 'https://example.com/article',
-      hls_url: 'https://r2.example.com/episodes/uuid-123/playlist.m3u8',
-      raw_text: 'raw text content',
-      script: 'generated script',
-      llm_model: 'mistralai/mistral-7b-instruct-v0.1',
-      llm_thinking_model: 'anthropic/claude-3-opus',
-      llm_provider: 'Cloudflare',
-      status: 'completed',
-      created_at: '2024-01-01T00:00:00Z',
-      listened: true,
-    };
+  it('maps a localization view row and embedded classroom lessons', () => {
+    const row = listRow({
+      language_classrooms: [
+        {
+          sourceLanguageCode: 'zh-Hant',
+          targetLanguageCode: 'ja',
+          oneLiner: 'この記事は流動性を説明します。',
+          keywords: [
+            {
+              term: '流動性',
+              reading: 'りゅうどうせい',
+              meaning: '資金進出市場的容易程度',
+              note: null,
+            },
+          ],
+        },
+      ],
+    });
 
     const response = toEpisodeResponse(row);
-    expect(response.id).toBe('uuid-123');
-    expect(response.title).toBe('Episode Title');
-    expect(response.hlsUrl).toBe('https://r2.example.com/episodes/uuid-123/playlist.m3u8');
-    expect(response.createdAt).toBe('2024-01-01T00:00:00Z');
-    expect(response.listened).toBe(true);
-    expect(response.script).toBe('generated script');
-    expect(response.llmModel).toBe('mistralai/mistral-7b-instruct-v0.1');
-    expect(response.llmThinkingModel).toBe('anthropic/claude-3-opus');
-    expect(response.llmProvider).toBe('Cloudflare');
-    expect(response.status).toBe('completed');
-  });
 
-  it('handles null optional fields', () => {
-    const row: EpisodeRow = {
-      id: 'uuid-456',
-      title: 'Minimal Episode',
-      source_url: 'https://example.com',
-      hls_url: '',
-      raw_text: null,
-      script: null,
-      llm_model: null,
-      llm_thinking_model: null,
-      llm_provider: null,
-      status: 'pending',
-      created_at: '2024-01-02T00:00:00Z',
+    expect(response).toEqual({
+      id: row.episode_id,
+      localizationId: row.localization_id,
+      title: row.title,
+      languageCode: 'zh-Hant',
+      hlsUrl: row.hls_url,
+      createdAt: row.created_at,
       listened: false,
-    };
-
-    const response = toEpisodeResponse(row);
-    expect(response.llmModel).toBeNull();
-    expect(response.llmThinkingModel).toBeNull();
-    expect(response.llmProvider).toBeNull();
-    expect(response.listened).toBe(false);
-    expect(response.script).toBeNull();
+      script: row.script,
+      llmModel: row.llm_model,
+      llmThinkingModel: row.llm_thinking_model,
+      llmProvider: row.llm_provider,
+      status: row.status,
+      languageClassrooms: [
+        {
+          sourceLanguageCode: 'zh-Hant',
+          targetLanguageCode: 'ja',
+          oneLiner: 'この記事は流動性を説明します。',
+          keywords: [
+            {
+              term: '流動性',
+              reading: 'りゅうどうせい',
+              meaning: '資金進出市場的容易程度',
+              note: null,
+            },
+          ],
+        },
+      ],
+    });
   });
 });
 
-describe('findEpisodeBySourceUrl', () => {
-  it('returns episode when found', async () => {
-    const episode: EpisodeRow = {
-      id: '123',
-      title: 'Test',
-      source_url: 'https://example.com',
-      hls_url: '',
-      raw_text: null,
-      script: null,
-      llm_model: null,
-      llm_thinking_model: null,
-      llm_provider: null,
-      status: 'pending',
-      created_at: '',
-      listened: false,
-    };
-    mockMaybeSingle.mockResolvedValue({ data: episode, error: null });
+describe('episode source and localization lookup', () => {
+  it('finds an episode by source URL without language filtering', async () => {
+    const row = episodeRow();
+    state.query!.maybeSingle.mockResolvedValue({ data: row, error: null });
 
-    const result = await findEpisodeBySourceUrl('https://example.com');
+    const result = await findEpisodeBySourceUrl('https://example.com/article');
+
     expect(createClient).toHaveBeenCalledWith(
       'https://example.supabase.co',
       'test-key',
@@ -146,18 +131,22 @@ describe('findEpisodeBySourceUrl', () => {
         db: { schema: 'from_fed_to_chain' },
       }),
     );
-    expect(result).toEqual(episode);
+    expect(mockFrom).toHaveBeenCalledWith('episodes');
+    expect(state.query!.eq).toHaveBeenCalledWith('source_url', 'https://example.com/article');
+    expect(state.query!.eq).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(row);
   });
 
-  it('returns null when not found', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: null, error: null });
-    const result = await findEpisodeBySourceUrl('https://example.com/not-found');
-    expect(result).toBeNull();
-  });
+  it('finds an episode localization by episode id and language', async () => {
+    const row = localizationRow();
+    state.query!.maybeSingle.mockResolvedValue({ data: row, error: null });
 
-  it('throws on database error', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: null, error: { message: 'db error' } });
-    await expect(findEpisodeBySourceUrl('https://example.com')).rejects.toThrow('db error');
+    const result = await findEpisodeLocalizationByEpisodeId(row.episode_id, 'zh-Hant');
+
+    expect(mockFrom).toHaveBeenCalledWith('episode_localizations');
+    expect(state.query!.eq).toHaveBeenCalledWith('episode_id', row.episode_id);
+    expect(state.query!.eq).toHaveBeenCalledWith('language_code', 'zh-Hant');
+    expect(result).toEqual(row);
   });
 });
 
@@ -190,295 +179,256 @@ describe('cursor helpers', () => {
       ),
     ).toThrow('bad cursor id');
   });
-
-  it('rejects cursors with wrong field types', () => {
-    const invalidT = Buffer.from(
-      JSON.stringify({ t: 123, i: '00000000-0000-4000-8000-000000000001' }),
-      'utf8',
-    ).toString('base64url');
-    expect(() => decodeCursor(invalidT)).toThrow('bad cursor shape');
-
-    const invalidI = Buffer.from(
-      JSON.stringify({ t: '2024-01-01T00:00:00.000Z', i: 456 }),
-      'utf8',
-    ).toString('base64url');
-    expect(() => decodeCursor(invalidI)).toThrow('bad cursor shape');
-
-    const nullI = Buffer.from(
-      JSON.stringify({ t: '2024-01-01T00:00:00.000Z', i: null }),
-      'utf8',
-    ).toString('base64url');
-    expect(() => decodeCursor(nullI)).toThrow('bad cursor shape');
-  });
-});
-
-describe('listEpisodes', () => {
-  it('returns episodes ordered by created_at desc', async () => {
-    const episodes: EpisodeRow[] = [
-      {
-        id: '1',
-        title: 'Latest',
-        source_url: '',
-        hls_url: '',
-        raw_text: null,
-        script: null,
-        llm_model: null,
-        llm_thinking_model: null,
-        llm_provider: null,
-        status: 'pending',
-        created_at: '2024-01-02',
-        listened: false,
-      },
-    ];
-    vi.mocked(mockSelect).mockReturnValue({
-      order: vi.fn().mockReturnValue({
-        returns: vi.fn().mockResolvedValue({ data: episodes, error: null }),
-      }),
-      maybeSingle: mockMaybeSingle,
-    });
-
-    const result = await listEpisodes();
-    expect(result).toEqual(episodes);
-  });
-
-  it('returns empty array on null data', async () => {
-    vi.mocked(mockSelect).mockReturnValue({
-      order: vi.fn().mockReturnValue({
-        returns: vi.fn().mockResolvedValue({ data: null, error: null }),
-      }),
-      maybeSingle: mockMaybeSingle,
-    });
-
-    const result = await listEpisodes();
-    expect(result).toEqual([]);
-  });
-
-  it('throws on database error', async () => {
-    vi.mocked(mockSelect).mockReturnValue({
-      order: vi.fn().mockReturnValue({
-        returns: vi.fn().mockResolvedValue({ data: null, error: { message: 'list error' } }),
-      }),
-      maybeSingle: mockMaybeSingle,
-    });
-
-    await expect(listEpisodes()).rejects.toThrow('list error');
-  });
 });
 
 describe('listEpisodesPaged', () => {
-  function row(index: number): EpisodeRow {
-    const day = (25 - index).toString().padStart(2, '0');
-    const idSuffix = (index + 1).toString().padStart(12, '0');
-    return {
-      id: `00000000-0000-4000-8000-${idSuffix}`,
-      title: `Episode ${index + 1}`,
-      source_url: `https://example.com/${index + 1}`,
-      hls_url: '',
-      raw_text: null,
-      script: null,
-      llm_model: null,
-      llm_thinking_model: null,
-      llm_provider: null,
-      status: 'completed',
-      created_at: `2024-01-${day}T00:00:00.000Z`,
-      listened: false,
+  it('queries the localization view by language and returns next cursor', async () => {
+    const rows = [listRow({ id: '00000000-0000-4000-8000-000000000001' })];
+    state.query!.returns.mockResolvedValue({ data: [...rows, listRow()], error: null });
+
+    const result = await listEpisodesPaged(1, null, 'zh-Hant');
+
+    expect(mockFrom).toHaveBeenCalledWith('episodes_with_stats');
+    expect(state.query!.eq).toHaveBeenCalledWith('language_code', 'zh-Hant');
+    expect(state.query!.limit).toHaveBeenCalledWith(2);
+    expect(result.rows).toEqual(rows);
+    expect(result.nextCursor).toBe(encodeCursor({ t: rows[0].created_at, i: rows[0].id }));
+  });
+
+  it('applies cursor filtering on subsequent pages', async () => {
+    const cursor = {
+      t: '2024-01-01T00:00:00.000Z',
+      i: '00000000-0000-4000-8000-000000000001',
     };
-  }
+    state.query!.returns.mockResolvedValue({ data: [], error: null });
 
-  function mockPagedQuery(data: EpisodeRow[]) {
-    const returns = vi.fn().mockResolvedValue({ data, error: null });
-    const or = vi.fn().mockReturnValue({ returns });
-    const limit = vi.fn().mockReturnValue({ returns, or });
-    const secondOrder = vi.fn().mockReturnValue({ limit });
-    const firstOrder = vi.fn().mockReturnValue({ order: secondOrder });
+    await listEpisodesPaged(20, cursor, 'zh-Hant');
 
-    vi.mocked(mockSelect).mockReturnValue({
-      order: firstOrder,
-      maybeSingle: mockMaybeSingle,
-    });
-
-    return { firstOrder, secondOrder, limit, or, returns };
-  }
-
-  it('returns nextCursor on page 1 and null on the final page', async () => {
-    const seeded = Array.from({ length: 25 }, (_, index) => row(index));
-
-    const page1Query = mockPagedQuery(seeded.slice(0, 21));
-    const page1 = await listEpisodesPaged(20, null);
-
-    expect(page1.rows).toEqual(seeded.slice(0, 20));
-    expect(page1.nextCursor).toBe(
-      encodeCursor({
-        t: seeded[19].created_at,
-        i: seeded[19].id,
-      }),
-    );
-    expect(page1Query.limit).toHaveBeenCalledWith(21);
-
-    const cursor = decodeCursor(page1.nextCursor!);
-    const page2Query = mockPagedQuery(seeded.slice(20));
-    const page2 = await listEpisodesPaged(20, cursor);
-
-    expect(page2.rows).toEqual(seeded.slice(20));
-    expect(page2.nextCursor).toBeNull();
-    expect(page2Query.or).toHaveBeenCalledWith(
+    expect(state.query!.or).toHaveBeenCalledWith(
       `created_at.lt.${cursor.t},and(created_at.eq.${cursor.t},id.lt.${cursor.i})`,
     );
   });
 });
 
-describe('insertEpisode', () => {
-  it('inserts episode and returns created row', async () => {
-    const row: EpisodeRow = {
-      id: 'new-id',
-      title: 'New',
-      source_url: 'https://example.com',
-      hls_url: '',
-      raw_text: 'text',
-      script: '',
-      llm_model: '',
-      llm_thinking_model: null,
-      llm_provider: '',
-      status: 'scraped',
-      created_at: '2024-01-01',
-      listened: false,
-    };
-    mockMaybeSingle.mockResolvedValue({ data: row, error: null });
+describe('insertEpisode and insertEpisodeLocalization', () => {
+  it('inserts a source episode row', async () => {
+    const row = episodeRow();
+    state.query!.single.mockResolvedValue({ data: row, error: null });
 
     const result = await insertEpisode({
-      id: 'new-id',
-      title: 'New',
-      sourceUrl: 'https://example.com',
-      hlsUrl: '',
-      rawText: 'text',
-      script: '',
-      llmModel: '',
-      llmThinkingModel: null,
-      llmProvider: '',
-      status: 'scraped',
+      id: row.id,
+      sourceUrl: row.source_url,
+      sourceTitle: row.source_title ?? '',
     });
 
-    expect(result.id).toBe('new-id');
-  });
-
-  it('throws on database error', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: null, error: { message: 'insert error' } });
-
-    await expect(
-      insertEpisode({
-        id: 'id',
-        title: 'Title',
-        sourceUrl: 'https://example.com',
-        hlsUrl: '',
-        rawText: '',
-        script: '',
-        llmModel: '',
-        llmThinkingModel: null,
-        llmProvider: '',
-        status: 'pending',
-      }),
-    ).rejects.toThrow('insert error');
-  });
-});
-
-describe('markEpisodeListened', () => {
-  it('updates listened to true and returns episode', async () => {
-    const row: EpisodeRow = {
-      id: '123',
-      title: 'Test',
-      source_url: '',
-      hls_url: '',
-      raw_text: null,
-      script: null,
-      llm_model: null,
-      llm_thinking_model: null,
-      llm_provider: null,
-      status: 'completed',
-      created_at: '',
-      listened: true,
-    };
-    mockMaybeSingle.mockResolvedValue({ data: row, error: null });
-
-    const result = await markEpisodeListened('123');
-    expect(mockUpdate).toHaveBeenCalledWith({ listened: true });
+    expect(mockFrom).toHaveBeenCalledWith('episodes');
+    expect(state.query!.insert).toHaveBeenCalledWith({
+      id: row.id,
+      source_url: row.source_url,
+      source_title: row.source_title,
+    });
     expect(result).toEqual(row);
   });
 
-  it('returns null when episode not found', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+  it('inserts a localized episode row', async () => {
+    const row = localizationRow();
+    state.query!.single.mockResolvedValue({ data: row, error: null });
 
-    const result = await markEpisodeListened('not-found');
-    expect(result).toBeNull();
-  });
+    const result = await insertEpisodeLocalization({
+      id: row.id,
+      episodeId: row.episode_id,
+      languageCode: row.language_code,
+      title: row.title,
+      hlsUrl: row.hls_url,
+      rawText: row.raw_text ?? '',
+      script: row.script ?? '',
+      llmModel: row.llm_model ?? '',
+      llmThinkingModel: row.llm_thinking_model,
+      llmProvider: row.llm_provider ?? '',
+      ttsLanguageCode: null,
+      ttsVoiceName: null,
+      r2Prefix: null,
+      status: row.status,
+    });
 
-  it('throws on database error', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: null, error: { message: 'mark error' } });
-
-    await expect(markEpisodeListened('123')).rejects.toThrow('mark error');
+    expect(mockFrom).toHaveBeenCalledWith('episode_localizations');
+    expect(state.query!.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        episode_id: row.episode_id,
+        language_code: 'zh-Hant',
+      }),
+    );
+    expect(result).toEqual(row);
   });
 });
 
-describe('updateEpisodeStatus', () => {
-  it('updates status only', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: { id: '123', status: 'scraped' }, error: null });
-    await updateEpisodeStatus('123', 'scraped');
+describe('language classrooms', () => {
+  it('groups classrooms by episode localization id', async () => {
+    const rows = [
+      classroomRow({ episode_localization_id: 'loc-1', target_language_code: 'ja' }),
+      classroomRow({ episode_localization_id: 'loc-2', target_language_code: 'en' }),
+    ];
+    state.query!.returns.mockResolvedValue({ data: rows, error: null });
+
+    const result = await listLanguageClassroomsByLocalizationIds(['loc-1', 'loc-2']);
+
+    expect(mockFrom).toHaveBeenCalledWith('language_classrooms');
+    expect(state.query!.in).toHaveBeenCalledWith('episode_localization_id', ['loc-1', 'loc-2']);
+    expect(result.get('loc-1')).toEqual([rows[0]]);
+    expect(result.get('loc-2')).toEqual([rows[1]]);
+  });
+
+  it('upserts classrooms keyed by localization and target language', async () => {
+    await upsertLanguageClassrooms([
+      {
+        id: 'ignored',
+        episodeLocalizationId: 'loc-1',
+        sourceLanguageCode: 'zh-Hant',
+        targetLanguageCode: 'ja',
+        oneLiner: 'この記事は流動性を説明します。',
+        keywords: [],
+        llmModel: 'model',
+        llmThinkingModel: null,
+        llmProvider: 'provider',
+      },
+    ]);
+
+    expect(state.query!.upsert).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          episode_localization_id: 'loc-1',
+          source_language_code: 'zh-Hant',
+          target_language_code: 'ja',
+        }),
+      ],
+      { onConflict: 'episode_localization_id,target_language_code' },
+    );
+  });
+});
+
+describe('updates', () => {
+  it('marks an episode listened on the source episode row', async () => {
+    const row = episodeRow({ listened: true });
+    state.query!.maybeSingle.mockResolvedValue({ data: row, error: null });
+
+    const result = await markEpisodeListened(row.id);
+
     expect(mockFrom).toHaveBeenCalledWith('episodes');
+    expect(state.query!.update).toHaveBeenCalledWith({ listened: true });
+    expect(result).toEqual(row);
   });
 
-  it('updates with script field', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: { id: '123' }, error: null });
-    await updateEpisodeStatus('123', 'script_generated', { script: 'new script' });
-  });
+  it('updates localized article content', async () => {
+    const row = localizationRow({ title: '軟體更新', raw_text: '滑鼠' });
+    state.query!.maybeSingle.mockResolvedValue({ data: row, error: null });
 
-  it('updates with llmModel field', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: { id: '123' }, error: null });
-    await updateEpisodeStatus('123', 'script_generated', { llmModel: 'model-x' });
-  });
-
-  it('updates with llmThinkingModel field', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: { id: '123' }, error: null });
-    await updateEpisodeStatus('123', 'script_generated', { llmThinkingModel: 'think-model' });
-  });
-
-  it('updates with llmProvider field', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: { id: '123' }, error: null });
-    await updateEpisodeStatus('123', 'script_generated', { llmProvider: 'provider-x' });
-  });
-
-  it('updates with hlsUrl field', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: { id: '123' }, error: null });
-    await updateEpisodeStatus('123', 'completed', { hlsUrl: 'https://cdn.example.com/hls.m3u8' });
-  });
-
-  it('persists explicit empty string updates', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: { id: '123' }, error: null });
-
-    await updateEpisodeStatus('123', 'scraped', {
-      script: '',
-      llmModel: '',
-      llmThinkingModel: '',
-      llmProvider: '',
-      hlsUrl: '',
+    const result = await updateEpisodeLocalizationArticleContent(row.id, {
+      title: row.title,
+      text: row.raw_text ?? '',
     });
 
-    expect(mockUpdate).toHaveBeenLastCalledWith({
-      status: 'scraped',
-      script: '',
-      llm_model: '',
-      llm_thinking_model: '',
-      llm_provider: '',
-      hls_url: '',
+    expect(mockFrom).toHaveBeenCalledWith('episode_localizations');
+    expect(state.query!.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '軟體更新',
+        raw_text: '滑鼠',
+      }),
+    );
+    expect(result).toEqual(row);
+  });
+
+  it('updates localized status and generated media fields', async () => {
+    const row = localizationRow({ status: 'completed' });
+    state.query!.maybeSingle.mockResolvedValue({ data: row, error: null });
+
+    await updateEpisodeLocalizationStatus(row.id, 'completed', {
+      hlsUrl: 'https://cdn.example.com/playlist.m3u8',
+      r2Prefix: 'episodes/e/localizations/zh-Hant',
+      ttsLanguageCode: 'cmn-TW',
+      ttsVoiceName: 'cmn-TW-Wavenet-A',
     });
-  });
 
-  it('returns null when episode not found', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: null, error: null });
-    const result = await updateEpisodeStatus('not-found', 'pending');
-    expect(result).toBeNull();
-  });
-
-  it('throws on database error', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: null, error: { message: 'update error' } });
-    await expect(updateEpisodeStatus('123', 'pending')).rejects.toThrow('update error');
+    expect(state.query!.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'completed',
+        hls_url: 'https://cdn.example.com/playlist.m3u8',
+        r2_prefix: 'episodes/e/localizations/zh-Hant',
+        tts_language_code: 'cmn-TW',
+        tts_voice_name: 'cmn-TW-Wavenet-A',
+      }),
+    );
   });
 });
+
+function episodeRow(overrides: Partial<EpisodeRow> = {}): EpisodeRow {
+  return {
+    id: '00000000-0000-4000-8000-000000000001',
+    source_url: 'https://example.com/article',
+    source_title: 'Source title',
+    created_at: '2024-01-01T00:00:00.000Z',
+    listened: false,
+    ...overrides,
+  };
+}
+
+function localizationRow(overrides: Partial<EpisodeLocalizationRow> = {}): EpisodeLocalizationRow {
+  return {
+    id: '00000000-0000-4000-8000-000000000101',
+    episode_id: '00000000-0000-4000-8000-000000000001',
+    language_code: 'zh-Hant',
+    title: 'Localization title',
+    hls_url: 'https://cdn.example.com/playlist.m3u8',
+    raw_text: 'Article text',
+    script: 'Script',
+    llm_model: 'model',
+    llm_thinking_model: null,
+    llm_provider: 'provider',
+    tts_language_code: null,
+    tts_voice_name: null,
+    r2_prefix: null,
+    status: 'completed',
+    created_at: '2024-01-01T00:00:00.000Z',
+    updated_at: '2024-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function listRow(overrides: Partial<EpisodeListRow> = {}): EpisodeListRow {
+  return {
+    id: '00000000-0000-4000-8000-000000000001',
+    episode_id: '00000000-0000-4000-8000-000000000001',
+    localization_id: '00000000-0000-4000-8000-000000000101',
+    title: 'Localization title',
+    language_code: 'zh-Hant',
+    hls_url: 'https://cdn.example.com/playlist.m3u8',
+    script: 'Script',
+    llm_model: 'model',
+    llm_thinking_model: null,
+    llm_provider: 'provider',
+    status: 'completed',
+    created_at: '2024-01-01T00:00:00.000Z',
+    listened: false,
+    like_count: 0,
+    language_classrooms: [],
+    ...overrides,
+  };
+}
+
+function classroomRow(
+  overrides: Partial<import('../types.js').LanguageClassroomRow> = {},
+): import('../types.js').LanguageClassroomRow {
+  return {
+    id: 'classroom-1',
+    episode_localization_id: 'loc-1',
+    source_language_code: 'zh-Hant',
+    target_language_code: 'ja',
+    one_liner: 'この記事は流動性を説明します。',
+    keywords: [],
+    llm_model: 'model',
+    llm_thinking_model: null,
+    llm_provider: 'provider',
+    created_at: '2024-01-01T00:00:00.000Z',
+    updated_at: '2024-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}

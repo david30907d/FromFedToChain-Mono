@@ -240,6 +240,19 @@ describe('splitTextIntoChunks', () => {
     const chunks = splitTextIntoChunks('句子一。句子二。', 4800);
     chunks.forEach((c) => expect(c.trim()).not.toBe(''));
   });
+
+  it('splits single very long word character-by-character when exceeds maxBytes', () => {
+    const longWord = 'a'.repeat(6000);
+    const chunks = splitTextIntoChunks(longWord, 4800);
+    expect(chunks.length).toBeGreaterThan(1);
+    const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+    expect(totalLength).toBe(longWord.length);
+  });
+
+  it('handles text with only punctuation marks', () => {
+    const chunks = splitTextIntoChunks('。！？', 4800);
+    expect(chunks.length).toBeGreaterThanOrEqual(1);
+  });
 });
 
 describe('synthesizeChunk', () => {
@@ -278,6 +291,66 @@ describe('concatenateAudioChunks', () => {
 
     const { concatenateAudioChunks: concat } = await import('./tts.js');
     const chunks = [Buffer.alloc(100, 0x01), Buffer.alloc(100, 0x02)];
+    const result = await concat(chunks);
+    expect(result).toBeInstanceOf(Buffer);
+  });
+
+  it('swallows error when unlinkSync throws on input file deletion', async () => {
+    vi.mock('node:fs', async () => {
+      const { writeFileSync } = await vi.importActual<typeof import('node:fs')>('node:fs');
+      return {
+        writeFileSync,
+        readFileSync: vi.fn().mockReturnValue(Buffer.alloc(300)),
+        unlinkSync: vi.fn().mockImplementation(() => {
+          throw new Error('unlink input file error');
+        }),
+      };
+    });
+
+    const { concatenateAudioChunks: concat } = await import('./tts.js');
+    const chunks = [Buffer.alloc(100, 0x01), Buffer.alloc(100, 0x02)];
+    const result = await concat(chunks);
+    expect(result).toBeInstanceOf(Buffer);
+  });
+
+  it('swallows error when unlinkSync throws on output file deletion', async () => {
+    let inputUnlinkCalled = false;
+    vi.mock('node:fs', async () => {
+      const { writeFileSync } = await vi.importActual<typeof import('node:fs')>('node:fs');
+      return {
+        writeFileSync,
+        readFileSync: vi.fn().mockReturnValue(Buffer.alloc(300)),
+        unlinkSync: vi.fn().mockImplementation(() => {
+          if (!inputUnlinkCalled) {
+            inputUnlinkCalled = true;
+            // First calls are for input files - succeed
+            return;
+          }
+          // Subsequent call for output file - throw
+          throw new Error('unlink output file error');
+        }),
+      };
+    });
+
+    const { concatenateAudioChunks: concat } = await import('./tts.js');
+    const chunks = [Buffer.alloc(100, 0x01), Buffer.alloc(100, 0x02)];
+    const result = await concat(chunks);
+    expect(result).toBeInstanceOf(Buffer);
+  });
+
+  it('concatenates multiple chunks (3+) with ffmpeg', async () => {
+    vi.mock('node:fs', async () => {
+      const { writeFileSync, unlinkSync } =
+        await vi.importActual<typeof import('node:fs')>('node:fs');
+      return {
+        writeFileSync,
+        unlinkSync,
+        readFileSync: vi.fn().mockReturnValue(Buffer.alloc(400)),
+      };
+    });
+
+    const { concatenateAudioChunks: concat } = await import('./tts.js');
+    const chunks = [Buffer.alloc(100, 0x01), Buffer.alloc(100, 0x02), Buffer.alloc(100, 0x03)];
     const result = await concat(chunks);
     expect(result).toBeInstanceOf(Buffer);
   });

@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import OpenAI from 'openai';
-import { buildUserMessage, generateScriptWithLLM } from './llm.js';
+import {
+  buildLanguageClassroomUserMessage,
+  buildUserMessage,
+  generateLanguageClassroomsWithLLM,
+  generateScriptWithLLM,
+} from './llm.js';
 
 const createMockOpenAI = (createMock: Mock): unknown => {
   return {
@@ -51,6 +56,22 @@ describe('buildUserMessage', () => {
   it('combines title and text with newlines', () => {
     const result = buildUserMessage('Title', 'Content');
     expect(result).toBe('標題：Title\n\n內容：\nContent');
+  });
+});
+
+describe('buildLanguageClassroomUserMessage', () => {
+  it('includes source and target languages', () => {
+    const result = buildLanguageClassroomUserMessage({
+      title: 'Title',
+      articleText: 'Article',
+      script: 'Script',
+      sourceLanguageCode: 'zh-Hant',
+      targetLanguageCodes: ['ja', 'en'],
+    });
+
+    expect(result).toContain('主語言：zh-Hant');
+    expect(result).toContain('目標語言：ja, en');
+    expect(result).toContain('Podcast 講稿：\nScript');
   });
 });
 
@@ -170,6 +191,23 @@ describe('generateScriptWithLLM', () => {
     expect(result.provider).toBe('unknown');
   });
 
+  it('returns unknown provider when API returns empty string provider', async () => {
+    const OpenAI = await import('openai');
+    const mockCreate = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: 'Script' } }],
+      provider: '',
+      model: 'test/model',
+    });
+
+    vi.mocked(OpenAI.default).mockImplementation(
+      () => createMockOpenAI(mockCreate) as unknown as OpenAI,
+    );
+
+    const result = await generateScriptWithLLM('Title', 'Text');
+
+    expect(result.provider).toBe('unknown');
+  });
+
   it('falls back to env model when API returns null model', async () => {
     vi.stubEnv('LLM_MODEL', 'fallback/model');
 
@@ -187,5 +225,118 @@ describe('generateScriptWithLLM', () => {
     const result = await generateScriptWithLLM('Title', 'Text');
 
     expect(result.model).toBe('fallback/model');
+  });
+
+  it('falls back to unknown when API returns empty string provider', async () => {
+    const OpenAI = await import('openai');
+    const mockCreate = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: 'Script' } }],
+      provider: '',
+      model: 'test/model',
+    });
+
+    vi.mocked(OpenAI.default).mockImplementation(
+      () => createMockOpenAI(mockCreate) as unknown as OpenAI,
+    );
+
+    const result = await generateScriptWithLLM('Title', 'Text');
+
+    expect(result.provider).toBe('unknown');
+  });
+});
+
+describe('generateLanguageClassroomsWithLLM', () => {
+  beforeEach(() => {
+    vi.stubEnv('OPENROUTER_API_KEY', 'test-api-key');
+    vi.stubEnv('OPENROUTER_BASE_URL', 'https://test.openrouter.ai/api/v1');
+    vi.stubEnv('LLM_MODEL', 'test/model');
+    vi.stubEnv('LLM_THINKING_MODEL', '');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns parsed language classroom lessons from JSON response', async () => {
+    const OpenAI = await import('openai');
+    const mockCreate = vi.fn().mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              lessons: [
+                {
+                  targetLanguageCode: 'ja',
+                  oneLiner: 'この記事は市場流動性を説明します。',
+                  keywords: [
+                    {
+                      term: '流動性',
+                      reading: 'りゅうどうせい',
+                      meaning: '資金容易進出市場的程度',
+                      note: '市場分析常用詞',
+                    },
+                  ],
+                },
+                {
+                  targetLanguageCode: 'en',
+                  oneLiner: 'This article explains market liquidity.',
+                  keywords: [
+                    {
+                      term: 'liquidity',
+                      reading: null,
+                      meaning: '資金流動性',
+                      note: null,
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        },
+      ],
+      provider: 'Cloudflare',
+      model: 'test/model',
+    });
+
+    vi.mocked(OpenAI.default).mockImplementation(
+      () => createMockOpenAI(mockCreate) as unknown as OpenAI,
+    );
+
+    const result = await generateLanguageClassroomsWithLLM({
+      title: '市場流動性',
+      articleText: '文章內容',
+      script: '講稿內容',
+      sourceLanguageCode: 'zh-Hant',
+      targetLanguageCodes: ['ja', 'en'],
+    });
+
+    expect(result.lessons).toHaveLength(2);
+    expect(result.lessons[0].targetLanguageCode).toBe('ja');
+    expect(result.lessons[0].keywords[0].term).toBe('流動性');
+    expect(result.lessons[1].targetLanguageCode).toBe('en');
+    expect(result.provider).toBe('Cloudflare');
+  });
+
+  it('throws when response has no valid lessons', async () => {
+    const OpenAI = await import('openai');
+    const mockCreate = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: '{"lessons":[]}' } }],
+      provider: 'Cloudflare',
+      model: 'test/model',
+    });
+
+    vi.mocked(OpenAI.default).mockImplementation(
+      () => createMockOpenAI(mockCreate) as unknown as OpenAI,
+    );
+
+    await expect(
+      generateLanguageClassroomsWithLLM({
+        title: 'Title',
+        articleText: 'Text',
+        script: 'Script',
+        sourceLanguageCode: 'zh-Hant',
+        targetLanguageCodes: ['ja'],
+      }),
+    ).rejects.toThrow('Language classroom response did not contain any valid lessons');
   });
 });
