@@ -211,8 +211,8 @@ Episode _episodeWithLanguageClassroom() {
   return _episode().copyWith(
     languageClassrooms: const [
       LanguageClassroomLesson(
-        sourceLanguageCode: 'zh-TW',
-        targetLanguageCode: 'ja-JP',
+        sourceLanguageCode: 'zh-Hant',
+        targetLanguageCode: 'ja',
         oneLiner: 'この記事は市場流動性を説明します。',
         keywords: [
           LanguageClassroomKeyword(

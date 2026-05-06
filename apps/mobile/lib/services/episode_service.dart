@@ -19,7 +19,7 @@ class EpisodeService {
     final rows = await _supabaseService.client
         .from('episodes_with_stats')
         .select(
-          'id,title,language_code,hls_url,created_at,listened,script,like_count,language_classrooms',
+          'id,localization_id,title,language_code,hls_url,created_at,listened,script,like_count,language_classrooms',
         )
         .eq('language_code', languageCode)
         .order('created_at', ascending: false)

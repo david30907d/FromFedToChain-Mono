@@ -3,6 +3,6 @@ class AppConfig {
 
   static const contentLanguageCode = String.fromEnvironment(
     'CONTENT_LANGUAGE_CODE',
-    defaultValue: 'zh-TW',
+    defaultValue: 'zh-Hant',
   );
 }

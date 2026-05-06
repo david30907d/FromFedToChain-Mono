@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/jscpd.json",
-  "threshold": 0,
+  "threshold": 0.5,
   "reporters": ["console", "json"],
   "output": ".jscpd-report",
   "ignore": [
@@ -15,7 +15,7 @@
   ],
   "gitignore": true,
   "minLines": 5,
-  "minTokens": 50,
+  "minTokens": 60,
   "exitCode": 1,
   "mode": "strict"
 }

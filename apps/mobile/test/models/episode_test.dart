@@ -26,7 +26,8 @@ void main() {
       expect(track.title, 'English');
     });
 
-    test('fromJson falls back to languageCode as title when title is empty', () {
+    test('fromJson falls back to languageCode as title when title is empty',
+        () {
       final track = AudioTrack.fromJson({
         'languageCode': 'ja',
         'title': '',
@@ -98,7 +99,7 @@ void main() {
       final episode = Episode.fromJson({
         'id': 'episode-123',
         'title': 'Test Episode',
-        'languageCode': 'zh-TW',
+        'languageCode': 'zh-Hant',
         'hlsUrl': 'https://example.com/audio.m3u8',
         'createdAt': '2024-01-15T10:30:00Z',
         'listened': true,
@@ -108,7 +109,7 @@ void main() {
 
       expect(episode.id, 'episode-123');
       expect(episode.title, 'Test Episode');
-      expect(episode.languageCode, 'zh-TW');
+      expect(episode.languageCode, 'zh-Hant');
       expect(episode.hlsUrl, 'https://example.com/audio.m3u8');
       expect(episode.listened, isTrue);
       expect(episode.likeCount, 5);
@@ -119,7 +120,7 @@ void main() {
       final episode = Episode.fromJson({
         'id': 'episode-456',
         'title': 'Another Episode',
-        'language_code': 'zh-TW',
+        'language_code': 'zh-Hant',
         'hls_url': 'https://example.com/audio.m3u8',
         'created_at': '2024-02-20T15:45:00Z',
         'listened': false,
@@ -127,7 +128,7 @@ void main() {
         'script': null,
       });
 
-      expect(episode.languageCode, 'zh-TW');
+      expect(episode.languageCode, 'zh-Hant');
       expect(episode.hlsUrl, 'https://example.com/audio.m3u8');
       expect(episode.createdAt.year, 2024);
       expect(episode.listened, isFalse);
@@ -163,8 +164,16 @@ void main() {
         'hlsUrl': 'https://example.com/audio.m3u8',
         'createdAt': '2024-01-01T00:00:00Z',
         'audioTracks': [
-          {'languageCode': 'zh', 'title': 'Chinese', 'hlsUrl': 'https://example.com/zh.m3u8'},
-          {'languageCode': 'en', 'title': 'English', 'hlsUrl': 'https://example.com/en.m3u8'},
+          {
+            'languageCode': 'zh',
+            'title': 'Chinese',
+            'hlsUrl': 'https://example.com/zh.m3u8'
+          },
+          {
+            'languageCode': 'en',
+            'title': 'English',
+            'hlsUrl': 'https://example.com/en.m3u8'
+          },
         ],
       });
 
@@ -181,8 +190,8 @@ void main() {
         'createdAt': '2024-01-01T00:00:00Z',
         'languageClassrooms': [
           {
-            'sourceLanguageCode': 'zh-TW',
-            'targetLanguageCode': 'en-US',
+            'sourceLanguageCode': 'zh-Hant',
+            'targetLanguageCode': 'en',
             'oneLiner': 'This article explains market liquidity.',
             'keywords': [
               {
@@ -196,7 +205,7 @@ void main() {
       });
 
       expect(episode.languageClassrooms.length, 1);
-      expect(episode.languageClassrooms.single.targetLanguageCode, 'en-US');
+      expect(episode.languageClassrooms.single.targetLanguageCode, 'en');
       expect(
         episode.languageClassrooms.single.keywords.single.meaning,
         '資金流動性',
@@ -211,9 +220,15 @@ void main() {
         createdAt: DateTime(2024),
         listened: false,
         audioTracks: const [
-          AudioTrack(languageCode: 'zh', title: 'Chinese', hlsUrl: 'https://example.com/zh.m3u8'),
+          AudioTrack(
+              languageCode: 'zh',
+              title: 'Chinese',
+              hlsUrl: 'https://example.com/zh.m3u8'),
           AudioTrack(languageCode: 'en', title: 'English', hlsUrl: ''),
-          AudioTrack(languageCode: 'ja', title: 'Japanese', hlsUrl: 'https://example.com/ja.m3u8'),
+          AudioTrack(
+              languageCode: 'ja',
+              title: 'Japanese',
+              hlsUrl: 'https://example.com/ja.m3u8'),
         ],
       );
 

@@ -2,6 +2,11 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getRequiredEnv, trimTrailingSlash } from '../lib/env.js';
 import type { HlsFile } from './hls.js';
 
+export interface HlsUploadResult {
+  hlsUrl: string;
+  r2Prefix: string;
+}
+
 let client: S3Client | null = null;
 let bucket: string | null = null;
 let publicBase: string | null = null;
@@ -34,8 +39,8 @@ export async function uploadHlsToR2(
   files: HlsFile[],
   episodeId: string,
   languageCode: string,
-): Promise<string> {
-  const prefix = `episodes/${languageCode}/${episodeId}`;
+): Promise<HlsUploadResult> {
+  const prefix = `episodes/${episodeId}/localizations/${languageCode}`;
   const r2 = getR2Client();
   const Bucket = getBucket();
 
@@ -52,5 +57,8 @@ export async function uploadHlsToR2(
     ),
   );
 
-  return `${getPublicBase()}/${prefix}/playlist.m3u8`;
+  return {
+    hlsUrl: `${getPublicBase()}/${prefix}/playlist.m3u8`,
+    r2Prefix: prefix,
+  };
 }

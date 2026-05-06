@@ -127,8 +127,9 @@ class LanguageClassroomLesson {
 class Episode {
   const Episode({
     required this.id,
+    String? localizationId,
     required this.title,
-    this.languageCode = 'zh-TW',
+    this.languageCode = 'zh-Hant',
     required this.hlsUrl,
     required this.createdAt,
     required this.listened,
@@ -136,9 +137,10 @@ class Episode {
     this.script,
     this.audioTracks = const [],
     this.languageClassrooms = const [],
-  });
+  }) : localizationId = localizationId ?? id;
 
   final String id;
+  final String localizationId;
   final String title;
   final String languageCode;
   final String hlsUrl;
@@ -156,6 +158,12 @@ class Episode {
   }
 
   factory Episode.fromJson(Map<String, dynamic> json) {
+    final id = json['id'] as String;
+    final localizationId = _readOptionalString(
+      json,
+      'localizationId',
+      'localization_id',
+    );
     final languageCode = _readOptionalString(
       json,
       'languageCode',
@@ -163,9 +171,10 @@ class Episode {
     );
 
     return Episode(
-      id: json['id'] as String,
+      id: id,
+      localizationId: localizationId.isNotEmpty ? localizationId : id,
       title: json['title'] as String,
-      languageCode: languageCode.isNotEmpty ? languageCode : 'zh-TW',
+      languageCode: languageCode.isNotEmpty ? languageCode : 'zh-Hant',
       hlsUrl: _readRequiredString(json, 'hlsUrl', 'hls_url'),
       createdAt: DateTime.parse(
         _readRequiredString(json, 'createdAt', 'created_at'),
@@ -180,6 +189,7 @@ class Episode {
 
   Episode copyWith({
     String? id,
+    String? localizationId,
     String? title,
     String? languageCode,
     String? hlsUrl,
@@ -192,6 +202,7 @@ class Episode {
   }) {
     return Episode(
       id: id ?? this.id,
+      localizationId: localizationId ?? this.localizationId,
       title: title ?? this.title,
       languageCode: languageCode ?? this.languageCode,
       hlsUrl: hlsUrl ?? this.hlsUrl,

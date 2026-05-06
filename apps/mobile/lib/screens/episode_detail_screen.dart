@@ -620,11 +620,11 @@ class _LanguageBadge extends StatelessWidget {
 
   static String _languageLabel(String languageCode) {
     switch (languageCode) {
-      case 'ja-JP':
+      case 'ja':
         return 'JP';
-      case 'en-US':
+      case 'en':
         return 'EN';
-      case 'zh-TW':
+      case 'zh-Hant':
         return '繁中';
       default:
         return languageCode;

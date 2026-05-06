@@ -1,5 +1,4 @@
 import 'package:ai_podcast_mobile/widgets/played_button.dart';
-import 'package:ai_podcast_mobile/theme/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -49,7 +48,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byType(OutlinedButton).first);
+      await tester.tap(find.text('Mark played'));
       expect(pressed, isTrue);
     });
 

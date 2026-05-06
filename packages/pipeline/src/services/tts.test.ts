@@ -350,11 +350,7 @@ describe('concatenateAudioChunks', () => {
     });
 
     const { concatenateAudioChunks: concat } = await import('./tts.js');
-    const chunks = [
-      Buffer.alloc(100, 0x01),
-      Buffer.alloc(100, 0x02),
-      Buffer.alloc(100, 0x03),
-    ];
+    const chunks = [Buffer.alloc(100, 0x01), Buffer.alloc(100, 0x02), Buffer.alloc(100, 0x03)];
     const result = await concat(chunks);
     expect(result).toBeInstanceOf(Buffer);
   });

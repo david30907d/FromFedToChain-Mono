@@ -1,41 +1,51 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { EpisodeRow, LanguageClassroomRow } from './types.js';
+import type {
+  EpisodeListRow,
+  EpisodeLocalizationRow,
+  EpisodeResponse,
+  EpisodeRow,
+  LanguageClassroomRow,
+} from './types.js';
 
 const {
   mockDecodeCursor,
   mockFindEpisodeBySourceUrl,
+  mockFindEpisodeLocalizationByEpisodeId,
   mockGenerateHls,
   mockGenerateLanguageClassroomsWithLLM,
   mockGenerateScriptWithLLM,
   mockInsertEpisode,
-  mockListLanguageClassroomsByEpisodeId,
-  mockListLanguageClassroomsByEpisodeIds,
+  mockInsertEpisodeLocalization,
   mockListEpisodesPaged,
+  mockListLanguageClassroomsByLocalizationId,
+  mockListLanguageClassroomsByLocalizationIds,
   mockMarkEpisodeListened,
   mockScrapeArticle,
   mockServe,
   mockTextToSpeech,
-  mockUpdateEpisodeArticleContent,
-  mockUpdateEpisodeStatus,
+  mockUpdateEpisodeLocalizationArticleContent,
+  mockUpdateEpisodeLocalizationStatus,
   mockUpsertLanguageClassrooms,
   mockUploadHlsToR2,
   mockConvertArticleToZhTW,
 } = vi.hoisted(() => ({
   mockDecodeCursor: vi.fn(),
   mockFindEpisodeBySourceUrl: vi.fn(),
+  mockFindEpisodeLocalizationByEpisodeId: vi.fn(),
   mockGenerateHls: vi.fn(),
   mockGenerateLanguageClassroomsWithLLM: vi.fn(),
   mockGenerateScriptWithLLM: vi.fn(),
   mockInsertEpisode: vi.fn(),
-  mockListLanguageClassroomsByEpisodeId: vi.fn(),
-  mockListLanguageClassroomsByEpisodeIds: vi.fn(),
+  mockInsertEpisodeLocalization: vi.fn(),
   mockListEpisodesPaged: vi.fn(),
+  mockListLanguageClassroomsByLocalizationId: vi.fn(),
+  mockListLanguageClassroomsByLocalizationIds: vi.fn(),
   mockMarkEpisodeListened: vi.fn(),
   mockScrapeArticle: vi.fn(),
   mockServe: vi.fn(),
   mockTextToSpeech: vi.fn(),
-  mockUpdateEpisodeArticleContent: vi.fn(),
-  mockUpdateEpisodeStatus: vi.fn(),
+  mockUpdateEpisodeLocalizationArticleContent: vi.fn(),
+  mockUpdateEpisodeLocalizationStatus: vi.fn(),
   mockUpsertLanguageClassrooms: vi.fn(),
   mockUploadHlsToR2: vi.fn(),
   mockConvertArticleToZhTW: vi.fn(),
@@ -49,42 +59,24 @@ vi.mock('./services/db.js', () => ({
   DEFAULT_LIMIT: 20,
   decodeCursor: mockDecodeCursor,
   findEpisodeBySourceUrl: mockFindEpisodeBySourceUrl,
+  findEpisodeLocalizationByEpisodeId: mockFindEpisodeLocalizationByEpisodeId,
   insertEpisode: mockInsertEpisode,
-  listLanguageClassroomsByEpisodeId: mockListLanguageClassroomsByEpisodeId,
-  listLanguageClassroomsByEpisodeIds: mockListLanguageClassroomsByEpisodeIds,
+  insertEpisodeLocalization: mockInsertEpisodeLocalization,
   listEpisodesPaged: mockListEpisodesPaged,
+  listLanguageClassroomsByLocalizationId: mockListLanguageClassroomsByLocalizationId,
+  listLanguageClassroomsByLocalizationIds: mockListLanguageClassroomsByLocalizationIds,
   markEpisodeListened: mockMarkEpisodeListened,
-  toEpisodeResponse: (row: EpisodeRow) => episodeResponse(row, []),
-  toEpisodeResponseWithClassrooms: (
-    row: EpisodeRow,
+  toEpisodeResponse: (row: EpisodeListRow, languageClassrooms?: LanguageClassroomRow[]) =>
+    episodeListResponse(row, languageClassrooms),
+  toEpisodeResponseFromLocalization: (
+    episode: EpisodeRow,
+    localization: EpisodeLocalizationRow,
     languageClassrooms: LanguageClassroomRow[],
-  ) => episodeResponse(row, languageClassrooms),
+  ) => localizationResponse(episode, localization, languageClassrooms),
   upsertLanguageClassrooms: mockUpsertLanguageClassrooms,
-  updateEpisodeArticleContent: mockUpdateEpisodeArticleContent,
-  updateEpisodeStatus: mockUpdateEpisodeStatus,
+  updateEpisodeLocalizationArticleContent: mockUpdateEpisodeLocalizationArticleContent,
+  updateEpisodeLocalizationStatus: mockUpdateEpisodeLocalizationStatus,
 }));
-
-function episodeResponse(row: EpisodeRow, languageClassrooms: LanguageClassroomRow[]) {
-  return {
-    id: row.id,
-    title: row.title,
-    languageCode: row.language_code,
-    hlsUrl: row.hls_url,
-    createdAt: row.created_at,
-    listened: row.listened,
-    script: row.script,
-    llmModel: row.llm_model,
-    llmThinkingModel: row.llm_thinking_model,
-    llmProvider: row.llm_provider,
-    status: row.status,
-    languageClassrooms: languageClassrooms.map((classroom) => ({
-      sourceLanguageCode: classroom.source_language_code,
-      targetLanguageCode: classroom.target_language_code,
-      oneLiner: classroom.one_liner,
-      keywords: classroom.keywords,
-    })),
-  };
-}
 
 vi.mock('./services/llm.js', () => ({
   generateLanguageClassroomsWithLLM: mockGenerateLanguageClassroomsWithLLM,
@@ -124,27 +116,12 @@ describe('health checks', () => {
 });
 
 describe('POST /ingest authorization', () => {
-  const completedEpisode: EpisodeRow = {
-    id: '00000000-0000-4000-8000-000000000002',
-    title: 'Ready Episode',
-    source_url: 'https://example.com/article',
-    language_code: 'zh-TW',
-    hls_url: 'https://cdn.example.com/ready.m3u8',
-    raw_text: 'Article text',
-    script: 'Episode script',
-    llm_model: 'test-model',
-    llm_thinking_model: null,
-    llm_provider: 'test-provider',
-    status: 'completed',
-    created_at: '2024-01-02T00:00:00.000Z',
-    listened: false,
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('INGEST_ADMIN_TOKEN', 'secret-token');
-    mockFindEpisodeBySourceUrl.mockResolvedValue(completedEpisode);
-    mockListLanguageClassroomsByEpisodeId.mockResolvedValue([]);
+    mockFindEpisodeBySourceUrl.mockResolvedValue(episodeRow());
+    mockFindEpisodeLocalizationByEpisodeId.mockResolvedValue(localizationRow());
+    mockListLanguageClassroomsByLocalizationId.mockResolvedValue([]);
     mockGenerateLanguageClassroomsWithLLM.mockResolvedValue({
       lessons: [],
       model: 'test-model',
@@ -179,7 +156,7 @@ describe('POST /ingest authorization', () => {
     expect(mockFindEpisodeBySourceUrl).not.toHaveBeenCalled();
   });
 
-  it('accepts valid admin authorization', async () => {
+  it('accepts valid admin authorization with default zh-Hant language', async () => {
     const response = await app.request('/ingest', {
       method: 'POST',
       headers: {
@@ -188,56 +165,44 @@ describe('POST /ingest authorization', () => {
       },
       body: JSON.stringify({ url: 'https://example.com/article' }),
     });
-    const body = await response.json();
+    const body = (await response.json()) as EpisodeResponse;
 
     expect(response.status).toBe(200);
-    expect(mockFindEpisodeBySourceUrl).toHaveBeenCalledWith('https://example.com/article', 'zh-TW');
-    expect(body).toEqual({
-      id: completedEpisode.id,
-      title: completedEpisode.title,
-      languageCode: completedEpisode.language_code,
-      hlsUrl: completedEpisode.hls_url,
-      createdAt: completedEpisode.created_at,
-      listened: completedEpisode.listened,
-      script: completedEpisode.script,
-      llmModel: completedEpisode.llm_model,
-      llmThinkingModel: completedEpisode.llm_thinking_model,
-      llmProvider: completedEpisode.llm_provider,
-      status: completedEpisode.status,
-      languageClassrooms: [],
+    expect(mockFindEpisodeBySourceUrl).toHaveBeenCalledWith('https://example.com/article');
+    expect(mockFindEpisodeLocalizationByEpisodeId).toHaveBeenCalledWith(episodeRow().id, 'zh-Hant');
+    expect(body.languageCode).toBe('zh-Hant');
+    expect(body.localizationId).toBe(localizationRow().id);
+  });
+
+  it('normalizes legacy zh-TW language aliases', async () => {
+    const response = await app.request('/ingest?language=zh-TW', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer secret-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ url: 'https://example.com/article' }),
     });
+
+    expect(response.status).toBe(200);
+    expect(mockFindEpisodeLocalizationByEpisodeId).toHaveBeenCalledWith(episodeRow().id, 'zh-Hant');
+  });
+
+  it('rejects unsupported primary languages in v1', async () => {
+    const response = await app.request('/ingest?language=ja', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer secret-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ url: 'https://example.com/article' }),
+    });
+
+    expect(response.status).toBe(400);
   });
 });
 
-describe('POST /ingest zh-TW conversion', () => {
-  const id = '00000000-0000-4000-8000-000000000003';
-  const url = 'https://example.com/article';
-  const hlsUrl = 'https://cdn.example.com/episodes/article/playlist.m3u8';
-  const completedEpisode: EpisodeRow = {
-    id,
-    title: '软件更新',
-    source_url: url,
-    language_code: 'zh-TW',
-    hls_url: hlsUrl,
-    raw_text: '鼠标和自行车市场',
-    script: 'Generated script',
-    llm_model: 'test-model',
-    llm_thinking_model: null,
-    llm_provider: 'test-provider',
-    status: 'completed',
-    created_at: '2024-01-03T00:00:00.000Z',
-    listened: false,
-  };
-  const convertedArticle = {
-    title: '軟體更新',
-    text: '滑鼠和腳踏車市場',
-  };
-  const convertedEpisode: EpisodeRow = {
-    ...completedEpisode,
-    title: convertedArticle.title,
-    raw_text: convertedArticle.text,
-  };
-
+describe('POST /ingest pipeline', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('INGEST_ADMIN_TOKEN', 'secret-token');
@@ -246,30 +211,51 @@ describe('POST /ingest zh-TW conversion', () => {
       title: '软件更新',
       text: '鼠标和自行车市场',
     });
-    mockInsertEpisode.mockResolvedValue({
-      ...completedEpisode,
-      hls_url: '',
-      script: '',
-      llm_model: '',
-      llm_provider: '',
-      status: 'scraped',
+    mockConvertArticleToZhTW.mockReturnValue({
+      title: '軟體更新',
+      text: '滑鼠和腳踏車市場',
     });
+    mockInsertEpisode.mockResolvedValue(episodeRow({ source_title: '软件更新' }));
+    mockInsertEpisodeLocalization.mockResolvedValue(
+      localizationRow({
+        title: '軟體更新',
+        raw_text: '滑鼠和腳踏車市場',
+        hls_url: '',
+        script: '',
+        llm_model: '',
+        llm_provider: '',
+        status: 'scraped',
+      }),
+    );
     mockGenerateScriptWithLLM.mockResolvedValue({
-      script: completedEpisode.script,
-      model: completedEpisode.llm_model,
-      thinkingModel: completedEpisode.llm_thinking_model,
-      provider: completedEpisode.llm_provider,
+      script: 'Generated script',
+      model: 'test-model',
+      thinkingModel: null,
+      provider: 'test-provider',
     });
-    mockUpdateEpisodeStatus.mockImplementation((_episodeId: string, status: string) => {
+    mockUpdateEpisodeLocalizationStatus.mockImplementation((_id: string, status: string) => {
       if (status === 'script_generated') {
-        return Promise.resolve({
-          ...completedEpisode,
-          hls_url: '',
-          status: 'script_generated',
-        });
+        return Promise.resolve(
+          localizationRow({
+            title: '軟體更新',
+            raw_text: '滑鼠和腳踏車市場',
+            hls_url: '',
+            script: 'Generated script',
+            status: 'script_generated',
+          }),
+        );
       }
       if (status === 'completed') {
-        return Promise.resolve(completedEpisode);
+        return Promise.resolve(
+          localizationRow({
+            title: '軟體更新',
+            raw_text: '滑鼠和腳踏車市場',
+            script: 'Generated script',
+            hls_url: 'https://cdn.example.com/episodes/e/localizations/zh-Hant/playlist.m3u8',
+            r2_prefix: 'episodes/e/localizations/zh-Hant',
+            status: 'completed',
+          }),
+        );
       }
       return Promise.resolve(null);
     });
@@ -284,101 +270,90 @@ describe('POST /ingest zh-TW conversion', () => {
       ],
       playlistKey: 'playlist.m3u8',
     });
-    mockUploadHlsToR2.mockResolvedValue(hlsUrl);
-    mockConvertArticleToZhTW.mockReturnValue(convertedArticle);
-    mockUpdateEpisodeArticleContent.mockResolvedValue(convertedEpisode);
-    mockListLanguageClassroomsByEpisodeId.mockResolvedValue([]);
+    mockUploadHlsToR2.mockResolvedValue({
+      hlsUrl: 'https://cdn.example.com/episodes/e/localizations/zh-Hant/playlist.m3u8',
+      r2Prefix: 'episodes/e/localizations/zh-Hant',
+    });
+    mockListLanguageClassroomsByLocalizationId.mockResolvedValue([]);
     mockGenerateLanguageClassroomsWithLLM.mockResolvedValue({
-      lessons: [],
+      lessons: [
+        {
+          sourceLanguageCode: 'zh-Hant',
+          targetLanguageCode: 'ja',
+          oneLiner: 'この記事は市場流動性を説明します。',
+          keywords: [],
+        },
+        {
+          sourceLanguageCode: 'zh-Hant',
+          targetLanguageCode: 'en',
+          oneLiner: 'This article explains market liquidity.',
+          keywords: [],
+        },
+      ],
       model: 'test-model',
       thinkingModel: null,
       provider: 'test-provider',
     });
-    mockUpsertLanguageClassrooms.mockResolvedValue([]);
+    mockUpsertLanguageClassrooms.mockResolvedValue([
+      classroomRow({ target_language_code: 'ja' }),
+      classroomRow({ id: 'classroom-en', target_language_code: 'en' }),
+    ]);
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it('converts completed article title and raw text to zh-TW after HLS upload', async () => {
+  it('creates a zh-Hant localization, uploads HLS under localization prefix, and generates ja/en classroom lessons', async () => {
     const response = await app.request('/ingest', {
       method: 'POST',
       headers: {
         authorization: 'Bearer secret-token',
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url: 'https://example.com/article' }),
     });
-    const body = await response.json();
+    const body = (await response.json()) as EpisodeResponse;
 
     expect(response.status).toBe(201);
     expect(mockConvertArticleToZhTW).toHaveBeenCalledWith({
-      title: completedEpisode.title,
-      text: completedEpisode.raw_text,
+      title: '软件更新',
+      text: '鼠标和自行车市场',
     });
-    expect(mockUpdateEpisodeArticleContent).toHaveBeenCalledWith(id, convertedArticle);
-    expect(mockUploadHlsToR2).toHaveBeenCalledWith(expect.any(Array), id, 'zh-TW');
-    expect(mockUpdateEpisodeArticleContent.mock.invocationCallOrder[0]).toBeGreaterThan(
-      mockUploadHlsToR2.mock.invocationCallOrder[0],
-    );
-    expect(mockUpdateEpisodeArticleContent.mock.invocationCallOrder[0]).toBeGreaterThan(
-      mockUpdateEpisodeStatus.mock.invocationCallOrder[1],
-    );
-    expect(body).toEqual({
-      id,
-      title: convertedEpisode.title,
-      languageCode: convertedEpisode.language_code,
-      hlsUrl,
-      createdAt: convertedEpisode.created_at,
-      listened: convertedEpisode.listened,
-      script: convertedEpisode.script,
-      llmModel: convertedEpisode.llm_model,
-      llmThinkingModel: convertedEpisode.llm_thinking_model,
-      llmProvider: convertedEpisode.llm_provider,
-      status: convertedEpisode.status,
-      languageClassrooms: [],
+    expect(mockInsertEpisode).toHaveBeenCalledWith({
+      id: expect.any(String),
+      sourceUrl: 'https://example.com/article',
+      sourceTitle: '软件更新',
     });
-  });
-
-  it('returns completed audio data when zh-TW conversion persistence fails', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    mockUpdateEpisodeArticleContent.mockRejectedValue(new Error('article update failed'));
-
-    const response = await app.request('/ingest', {
-      method: 'POST',
-      headers: {
-        authorization: 'Bearer secret-token',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ url }),
-    });
-    const body = await response.json();
-
-    expect(response.status).toBe(201);
-    expect(consoleError).toHaveBeenCalledWith(
-      '[/ingest] zh-TW article conversion failed:',
+    expect(mockInsertEpisodeLocalization).toHaveBeenCalledWith(
       expect.objectContaining({
-        episodeId: id,
-        message: '[step:updateEpisodeArticleContent:zhTW] article update failed',
+        episodeId: episodeRow().id,
+        languageCode: 'zh-Hant',
+        title: '軟體更新',
+        rawText: '滑鼠和腳踏車市場',
       }),
     );
-    expect(body).toEqual({
-      id,
-      title: completedEpisode.title,
-      languageCode: completedEpisode.language_code,
-      hlsUrl,
-      createdAt: completedEpisode.created_at,
-      listened: completedEpisode.listened,
-      script: completedEpisode.script,
-      llmModel: completedEpisode.llm_model,
-      llmThinkingModel: completedEpisode.llm_thinking_model,
-      llmProvider: completedEpisode.llm_provider,
-      status: completedEpisode.status,
-      languageClassrooms: [],
-    });
-
-    consoleError.mockRestore();
+    expect(mockUploadHlsToR2).toHaveBeenCalledWith(expect.any(Array), episodeRow().id, 'zh-Hant');
+    expect(mockUpdateEpisodeLocalizationStatus).toHaveBeenLastCalledWith(
+      localizationRow().id,
+      'completed',
+      expect.objectContaining({
+        hlsUrl: 'https://cdn.example.com/episodes/e/localizations/zh-Hant/playlist.m3u8',
+        r2Prefix: 'episodes/e/localizations/zh-Hant',
+        ttsLanguageCode: 'cmn-TW',
+        ttsVoiceName: 'cmn-TW-Wavenet-A',
+      }),
+    );
+    expect(mockGenerateLanguageClassroomsWithLLM).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceLanguageCode: 'zh-Hant',
+        targetLanguageCodes: ['ja', 'en'],
+      }),
+    );
+    expect(body.languageClassrooms.map((lesson) => lesson.targetLanguageCode)).toEqual([
+      'ja',
+      'en',
+    ]);
   });
 });
 
@@ -390,50 +365,37 @@ describe('GET /episodes', () => {
       i: raw,
     }));
     mockListEpisodesPaged.mockResolvedValue({ rows: [], nextCursor: null });
+    mockListLanguageClassroomsByLocalizationIds.mockResolvedValue(new Map());
   });
 
-  it('returns a paginated response', async () => {
-    const row: EpisodeRow = {
-      id: '00000000-0000-4000-8000-000000000001',
-      title: 'Latest',
-      source_url: 'https://example.com/latest',
-      language_code: 'zh-TW',
-      hls_url: 'https://cdn.example.com/latest.m3u8',
-      raw_text: null,
-      script: null,
-      llm_model: null,
-      llm_thinking_model: null,
-      llm_provider: null,
-      status: 'completed',
-      created_at: '2024-01-01T00:00:00.000Z',
-      listened: false,
-    };
+  it('returns a paginated localization response for zh-Hant', async () => {
+    const row = listRow();
     mockListEpisodesPaged.mockResolvedValue({
       rows: [row],
       nextCursor: 'next-cursor',
     });
-    mockListLanguageClassroomsByEpisodeIds.mockResolvedValue(new Map());
+    mockListLanguageClassroomsByLocalizationIds.mockResolvedValue(
+      new Map([[row.localization_id, [classroomRow()]]]),
+    );
 
     const response = await app.request('/episodes?limit=5');
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(mockListEpisodesPaged).toHaveBeenCalledWith(5, null, 'zh-TW');
+    expect(mockListEpisodesPaged).toHaveBeenCalledWith(5, null, 'zh-Hant');
+    expect(mockListLanguageClassroomsByLocalizationIds).toHaveBeenCalledWith([row.localization_id]);
     expect(body).toEqual({
       items: [
         {
-          id: row.id,
-          title: row.title,
-          languageCode: row.language_code,
-          hlsUrl: row.hls_url,
-          createdAt: row.created_at,
-          listened: row.listened,
-          script: row.script,
-          llmModel: row.llm_model,
-          llmThinkingModel: row.llm_thinking_model,
-          llmProvider: row.llm_provider,
-          status: row.status,
-          languageClassrooms: [],
+          ...episodeListResponse(row),
+          languageClassrooms: [
+            {
+              sourceLanguageCode: 'zh-Hant',
+              targetLanguageCode: 'ja',
+              oneLiner: 'この記事は市場流動性を説明します。',
+              keywords: [],
+            },
+          ],
         },
       ],
       nextCursor: 'next-cursor',
@@ -458,3 +420,157 @@ describe('GET /episodes', () => {
     expect(mockListEpisodesPaged).not.toHaveBeenCalled();
   });
 });
+
+describe('POST /episodes/:id/listened', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockMarkEpisodeListened.mockResolvedValue(episodeRow({ listened: true }));
+    mockFindEpisodeLocalizationByEpisodeId.mockResolvedValue(localizationRow());
+    mockListLanguageClassroomsByLocalizationId.mockResolvedValue([classroomRow()]);
+  });
+
+  it('marks the source episode listened and returns the requested localization', async () => {
+    const response = await app.request(`/episodes/${episodeRow().id}/listened`, {
+      method: 'POST',
+    });
+    const body = (await response.json()) as EpisodeResponse;
+
+    expect(response.status).toBe(200);
+    expect(mockMarkEpisodeListened).toHaveBeenCalledWith(episodeRow().id);
+    expect(mockFindEpisodeLocalizationByEpisodeId).toHaveBeenCalledWith(episodeRow().id, 'zh-Hant');
+    expect(body.listened).toBe(true);
+    expect(body.localizationId).toBe(localizationRow().id);
+  });
+});
+
+function localizationResponse(
+  episode: EpisodeRow,
+  localization: EpisodeLocalizationRow,
+  languageClassrooms: LanguageClassroomRow[],
+): EpisodeResponse {
+  return {
+    id: episode.id,
+    localizationId: localization.id,
+    title: localization.title,
+    languageCode: localization.language_code,
+    hlsUrl: localization.hls_url,
+    createdAt: episode.created_at,
+    listened: episode.listened,
+    script: localization.script,
+    llmModel: localization.llm_model,
+    llmThinkingModel: localization.llm_thinking_model,
+    llmProvider: localization.llm_provider,
+    status: localization.status,
+    languageClassrooms: languageClassrooms.map((classroom) => ({
+      sourceLanguageCode: classroom.source_language_code,
+      targetLanguageCode: classroom.target_language_code,
+      oneLiner: classroom.one_liner,
+      keywords: classroom.keywords,
+    })),
+  };
+}
+
+function episodeListResponse(
+  row: EpisodeListRow,
+  languageClassroomRows?: LanguageClassroomRow[],
+): EpisodeResponse {
+  const rawLanguageClassrooms = languageClassroomRows ?? row.language_classrooms;
+  const languageClassrooms = Array.isArray(rawLanguageClassrooms)
+    ? rawLanguageClassrooms.map((classroom) => {
+        const value = classroom as Record<string, unknown>;
+        return {
+          sourceLanguageCode: (value.sourceLanguageCode ?? value.source_language_code) as string,
+          targetLanguageCode: (value.targetLanguageCode ?? value.target_language_code) as string,
+          oneLiner: (value.oneLiner ?? value.one_liner) as string,
+          keywords: (value.keywords ?? []) as [],
+        };
+      })
+    : [];
+
+  return {
+    id: row.episode_id,
+    localizationId: row.localization_id,
+    title: row.title,
+    languageCode: row.language_code,
+    hlsUrl: row.hls_url,
+    createdAt: row.created_at,
+    listened: row.listened,
+    script: row.script,
+    llmModel: row.llm_model,
+    llmThinkingModel: row.llm_thinking_model,
+    llmProvider: row.llm_provider,
+    status: row.status,
+    languageClassrooms,
+  };
+}
+
+function episodeRow(overrides: Partial<EpisodeRow> = {}): EpisodeRow {
+  return {
+    id: '00000000-0000-4000-8000-000000000001',
+    source_url: 'https://example.com/article',
+    source_title: 'Source title',
+    created_at: '2024-01-01T00:00:00.000Z',
+    listened: false,
+    ...overrides,
+  };
+}
+
+function localizationRow(overrides: Partial<EpisodeLocalizationRow> = {}): EpisodeLocalizationRow {
+  return {
+    id: '00000000-0000-4000-8000-000000000101',
+    episode_id: episodeRow().id,
+    language_code: 'zh-Hant',
+    title: 'Localization title',
+    hls_url: 'https://cdn.example.com/playlist.m3u8',
+    raw_text: 'Article text',
+    script: 'Script',
+    llm_model: 'model',
+    llm_thinking_model: null,
+    llm_provider: 'provider',
+    tts_language_code: null,
+    tts_voice_name: null,
+    r2_prefix: null,
+    status: 'completed',
+    created_at: '2024-01-01T00:00:00.000Z',
+    updated_at: '2024-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function listRow(overrides: Partial<EpisodeListRow> = {}): EpisodeListRow {
+  return {
+    id: episodeRow().id,
+    episode_id: episodeRow().id,
+    localization_id: localizationRow().id,
+    title: 'Localization title',
+    language_code: 'zh-Hant',
+    hls_url: 'https://cdn.example.com/playlist.m3u8',
+    script: 'Script',
+    llm_model: 'model',
+    llm_thinking_model: null,
+    llm_provider: 'provider',
+    status: 'completed',
+    created_at: '2024-01-01T00:00:00.000Z',
+    listened: false,
+    like_count: 0,
+    language_classrooms: [],
+    ...overrides,
+  };
+}
+
+function classroomRow(overrides: Partial<LanguageClassroomRow> = {}): LanguageClassroomRow {
+  return {
+    id: 'classroom-ja',
+    episode_localization_id: localizationRow().id,
+    source_language_code: 'zh-Hant',
+    target_language_code: 'ja',
+    one_liner: 'この記事は市場流動性を説明します。',
+    keywords: [],
+    llm_model: 'model',
+    llm_thinking_model: null,
+    llm_provider: 'provider',
+    created_at: '2024-01-01T00:00:00.000Z',
+    updated_at: '2024-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}

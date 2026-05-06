@@ -7,7 +7,7 @@ void main() {
       final json = {
         'id': 'uuid-123',
         'title': 'Test Episode',
-        'languageCode': 'zh-TW',
+        'languageCode': 'zh-Hant',
         'hlsUrl': 'https://cdn.example.com/episodes/uuid-123/playlist.m3u8',
         'createdAt': '2024-01-01T12:00:00.000Z',
         'listened': true,
@@ -19,7 +19,7 @@ void main() {
 
       expect(episode.id, 'uuid-123');
       expect(episode.title, 'Test Episode');
-      expect(episode.languageCode, 'zh-TW');
+      expect(episode.languageCode, 'zh-Hant');
       expect(episode.hlsUrl,
           'https://cdn.example.com/episodes/uuid-123/playlist.m3u8');
       expect(episode.listened, true);
@@ -82,14 +82,14 @@ void main() {
       final episode = Episode.fromJson({
         'id': 'uuid-999',
         'title': 'Snake Case Episode',
-        'language_code': 'zh-TW',
+        'language_code': 'zh-Hant',
         'hls_url': 'https://cdn.example.com/episode.m3u8',
         'created_at': '2024-01-04T12:00:00.000Z',
         'like_count': 12,
       });
 
       expect(episode.hlsUrl, 'https://cdn.example.com/episode.m3u8');
-      expect(episode.languageCode, 'zh-TW');
+      expect(episode.languageCode, 'zh-Hant');
       expect(episode.likeCount, 12);
       expect(episode.listened, false);
     });
@@ -102,8 +102,8 @@ void main() {
         'createdAt': '2024-01-04T12:00:00.000Z',
         'languageClassrooms': [
           {
-            'sourceLanguageCode': 'zh-TW',
-            'targetLanguageCode': 'ja-JP',
+            'sourceLanguageCode': 'zh-Hant',
+            'targetLanguageCode': 'ja',
             'oneLiner': 'この記事は市場流動性を説明します。',
             'keywords': [
               {
@@ -118,7 +118,7 @@ void main() {
       });
 
       expect(episode.languageClassrooms, hasLength(1));
-      expect(episode.languageClassrooms.single.targetLanguageCode, 'ja-JP');
+      expect(episode.languageClassrooms.single.targetLanguageCode, 'ja');
       expect(episode.languageClassrooms.single.keywords.single.term, '流動性');
     });
 

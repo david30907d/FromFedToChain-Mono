@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { readNullableString, readString } from '../lib/string.js';
 import type {
   LanguageClassroomKeyword,
   LanguageClassroomLesson,
@@ -192,7 +193,7 @@ function languageClassroomSystemPrompt(sourceLanguageCode: string): string {
 {
   "lessons": [
     {
-      "targetLanguageCode": "ja-JP",
+      "targetLanguageCode": "ja",
       "oneLiner": "用目標語言寫一句可用來介紹整篇文章的話。",
       "keywords": [
         {
@@ -291,13 +292,4 @@ function normalizeLanguageClassroomKeyword(raw: unknown): LanguageClassroomKeywo
     meaning,
     note: readNullableString(value.note),
   };
-}
-
-function readString(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function readNullableString(value: unknown): string | null {
-  const text = readString(value);
-  return text || null;
 }
