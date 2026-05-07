@@ -93,5 +93,8 @@ jobs:
       - name: Analyze
         run: flutter analyze .
 
-      - name: Test
-        run: flutter test
+      - name: Test with coverage gate
+        run: flutter test --coverage
+
+      - name: Check coverage threshold
+        run: dart run tool/check_coverage.dart coverage/lcov.info 30

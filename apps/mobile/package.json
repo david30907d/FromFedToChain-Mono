@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "test": "flutter test",
-    "test:coverage": "flutter test --coverage",
+    "test:coverage": "flutter test --coverage && dart run tool/check_coverage.dart coverage/lcov.info 30",
     "lint": "dart analyze .",
     "format": "dart format .",
     "format:check": "dart format --set-exit-if-changed .",

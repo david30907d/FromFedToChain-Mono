@@ -10,6 +10,7 @@ import '../theme/colors.dart';
 import '../widgets/episode_hero_frame.dart';
 import '../widgets/like_button.dart';
 import '../widgets/played_button.dart';
+import '../widgets/play_pause_button.dart';
 import '../widgets/playback_speed_menu.dart';
 import '../widgets/share_button.dart';
 
@@ -261,28 +262,13 @@ class _PlaybackControlsState extends State<_PlaybackControls> {
                   scale: _pressed ? 0.96 : 1,
                   duration: const Duration(milliseconds: 90),
                   curve: Curves.easeOutCubic,
-                  child: IconButton.filled(
-                    tooltip: isPlaying ? 'Pause' : 'Play',
-                    style: IconButton.styleFrom(
-                      fixedSize: const Size.square(52),
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: AppColors.background,
-                    ),
-                    onPressed: isLoading ? null : _togglePlayback,
-                    icon: isLoading
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.background,
-                            ),
-                          )
-                        : Icon(
-                            isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            size: 28,
-                          ),
+                  child: PlayPauseButton(
+                    isPlaying: isPlaying,
+                    isLoading: isLoading,
+                    onPressed: _togglePlayback,
+                    fixedSize: const Size.square(52),
+                    iconSize: 28,
+                    spinnerSize: 20,
                   ),
                 ),
                 const SizedBox(width: 12),

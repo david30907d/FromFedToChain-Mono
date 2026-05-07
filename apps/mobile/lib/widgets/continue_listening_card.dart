@@ -7,8 +7,9 @@ import '../theme/colors.dart';
 import '../utils/date_format.dart';
 import 'episode_hero_frame.dart';
 import 'like_button.dart';
-import 'share_button.dart';
 import 'played_button.dart';
+import 'play_pause_button.dart';
+import 'share_button.dart';
 
 class ContinueListeningCard extends StatelessWidget {
   const ContinueListeningCard({
@@ -111,19 +112,11 @@ class ContinueListeningCard extends StatelessWidget {
             runSpacing: 12,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              FilledButton.icon(
-                onPressed: isLoading ? null : onPlay,
-                icon: isLoading
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                      ),
-                label: Text(buttonLabel),
+              PlayPauseButton(
+                isPlaying: isPlaying,
+                isLoading: isLoading,
+                onPressed: onPlay,
+                label: buttonLabel,
               ),
               LikeButton(episode: episode),
               ShareButton(episode: episode),

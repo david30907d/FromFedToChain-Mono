@@ -8,9 +8,10 @@ import '../theme/colors.dart';
 import '../utils/date_format.dart';
 import 'episode_status_badge.dart';
 import 'like_button.dart';
+import 'play_pause_button.dart';
 import 'share_button.dart';
 
-class EpisodeCard extends StatefulWidget {
+class EpisodeCard extends StatelessWidget {
   const EpisodeCard({
     super.key,
     required this.episode,
@@ -21,16 +22,11 @@ class EpisodeCard extends StatefulWidget {
   });
 
   final Episode episode;
-  final bool isPlaying;
-  final bool isLoading;
   final VoidCallback onPlay;
   final VoidCallback onToggleListened;
+  final bool isPlaying;
+  final bool isLoading;
 
-  @override
-  State<EpisodeCard> createState() => _EpisodeCardState();
-}
-
-class _EpisodeCardState extends State<EpisodeCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -42,7 +38,7 @@ class _EpisodeCardState extends State<EpisodeCard> {
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: _openDetail,
+          onTap: () => _openDetail(context),
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Row(
@@ -50,13 +46,14 @@ class _EpisodeCardState extends State<EpisodeCard> {
               children: [
                 Padding(
                   padding: const EdgeInsets.only(top: 14),
-                  child: EpisodeStatusBadge(status: widget.episode.status),
+                  child: EpisodeStatusBadge(status: episode.status),
                 ),
                 const SizedBox(width: 10),
-                _PlayButton(
-                  isPlaying: widget.isPlaying,
-                  isLoading: widget.isLoading,
-                  onPressed: widget.onPlay,
+                PlayPauseButton(
+                  isPlaying: isPlaying,
+                  isLoading: isLoading,
+                  onPressed: onPlay,
+                  variant: PlayPauseButtonVariant.secondary,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -64,7 +61,7 @@ class _EpisodeCardState extends State<EpisodeCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.episode.title,
+                        episode.title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleMedium,
@@ -76,15 +73,15 @@ class _EpisodeCardState extends State<EpisodeCard> {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
-                            formatEpisodeDate(widget.episode.createdAt),
+                            formatEpisodeDate(episode.createdAt),
                             style: theme.textTheme.bodySmall,
                           ),
                           LikeButton(
-                            episode: widget.episode,
+                            episode: episode,
                             compact: true,
                           ),
                           ShareButton(
-                            episode: widget.episode,
+                            episode: episode,
                             compact: true,
                           ),
                         ],
@@ -100,7 +97,7 @@ class _EpisodeCardState extends State<EpisodeCard> {
                     Icons.more_horiz_rounded,
                     color: AppColors.textSecondary,
                   ),
-                  onPressed: _showMoreOptions,
+                  onPressed: () => _showMoreOptions(context),
                 ),
               ],
             ),
@@ -110,19 +107,19 @@ class _EpisodeCardState extends State<EpisodeCard> {
     );
   }
 
-  void _openDetail() {
+  void _openDetail(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => EpisodeDetailScreen(
-          episode: widget.episode,
-          onToggleListened: (_) => widget.onToggleListened(),
+          episode: episode,
+          onToggleListened: (_) => onToggleListened(),
         ),
       ),
     );
   }
 
-  void _showMoreOptions() {
+  void _showMoreOptions(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceElevated,
@@ -134,19 +131,19 @@ class _EpisodeCardState extends State<EpisodeCard> {
             children: [
               ListTile(
                 leading: Icon(
-                  widget.episode.listened
+                  episode.listened
                       ? Icons.check_circle_rounded
                       : Icons.check_circle_outline_rounded,
-                  color: widget.episode.listened
+                  color: episode.listened
                       ? AppColors.success
                       : AppColors.textSecondary,
                 ),
                 title: Text(
-                  widget.episode.listened ? 'Played' : 'Mark as played',
+                  episode.listened ? 'Played' : 'Mark as played',
                 ),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  widget.onToggleListened();
+                  onToggleListened();
                 },
               ),
               ListTile(
@@ -158,8 +155,8 @@ class _EpisodeCardState extends State<EpisodeCard> {
                 onTap: () {
                   Navigator.pop(sheetContext);
                   Share.share(
-                    '${widget.episode.title} - ${widget.episode.hlsUrl}',
-                    subject: widget.episode.title,
+                    '${episode.title} - ${episode.hlsUrl}',
+                    subject: episode.title,
                   );
                 },
               ),
@@ -168,38 +165,6 @@ class _EpisodeCardState extends State<EpisodeCard> {
           ),
         );
       },
-    );
-  }
-}
-
-class _PlayButton extends StatelessWidget {
-  const _PlayButton({
-    required this.isPlaying,
-    required this.isLoading,
-    required this.onPressed,
-  });
-
-  final bool isPlaying;
-  final bool isLoading;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton.filled(
-      tooltip: isPlaying ? 'Pause' : 'Play',
-      style: IconButton.styleFrom(
-        backgroundColor: AppColors.surfaceElevated,
-        foregroundColor: AppColors.accent,
-      ),
-      onPressed: isLoading ? null : onPressed,
-      icon: isLoading
-          ? const SizedBox.square(
-              dimension: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Icon(
-              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-            ),
     );
   }
 }

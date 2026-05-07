@@ -15,10 +15,27 @@ class UserEpisodeState {
 }
 
 class EpisodeService {
-  EpisodeService({SupabaseService? supabaseService})
-      : _supabaseService = supabaseService ?? SupabaseService();
+  EpisodeService({
+    SupabaseService? supabaseService,
+    UserEpisodeStateWriter? userEpisodeStateWriter,
+    DateTime Function()? now,
+  }) : this._(
+          supabaseService ?? SupabaseService(),
+          userEpisodeStateWriter,
+          now ?? DateTime.now,
+        );
+
+  EpisodeService._(
+    SupabaseService supabaseService,
+    UserEpisodeStateWriter? userEpisodeStateWriter,
+    this._now,
+  )   : _supabaseService = supabaseService,
+        _userEpisodeStateWriter = userEpisodeStateWriter ??
+            SupabaseUserEpisodeStateWriter(supabaseService);
 
   final SupabaseService _supabaseService;
+  final UserEpisodeStateWriter _userEpisodeStateWriter;
+  final DateTime Function() _now;
 
   Future<EpisodePage> getEpisodes({
     int limit = 20,
@@ -89,12 +106,12 @@ class EpisodeService {
     required String episodeId,
     required bool listened,
   }) async {
-    await _supabaseService.client.from('user_episode_state').upsert(
+    await _userEpisodeStateWriter.upsert(
       {
         'user_id': userId,
         'episode_id': episodeId,
         'listened': listened,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
+        'updated_at': _now().toUtc().toIso8601String(),
       },
       onConflict: 'user_id,episode_id',
     );
@@ -105,15 +122,39 @@ class EpisodeService {
     required String episodeId,
     required int seconds,
   }) async {
-    await _supabaseService.client.from('user_episode_state').upsert(
+    await _userEpisodeStateWriter.upsert(
       {
         'user_id': userId,
         'episode_id': episodeId,
         'last_position_seconds': seconds,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
+        'updated_at': _now().toUtc().toIso8601String(),
       },
       onConflict: 'user_id,episode_id',
     );
+  }
+}
+
+abstract interface class UserEpisodeStateWriter {
+  Future<void> upsert(
+    Map<String, Object?> values, {
+    required String onConflict,
+  });
+}
+
+class SupabaseUserEpisodeStateWriter implements UserEpisodeStateWriter {
+  const SupabaseUserEpisodeStateWriter(this._supabaseService);
+
+  final SupabaseService _supabaseService;
+
+  @override
+  Future<void> upsert(
+    Map<String, Object?> values, {
+    required String onConflict,
+  }) async {
+    await _supabaseService.client.from('user_episode_state').upsert(
+          values,
+          onConflict: onConflict,
+        );
   }
 }
 

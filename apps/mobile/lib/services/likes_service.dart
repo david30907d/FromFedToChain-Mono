@@ -11,15 +11,16 @@ class LikeSnapshot {
 }
 
 class LikesService {
-  LikesService({SupabaseService? supabaseService})
-      : _supabaseService = supabaseService ?? SupabaseService();
+  LikesService({
+    SupabaseService? supabaseService,
+    LikesStore? store,
+  }) : _store =
+            store ?? SupabaseLikesStore(supabaseService ?? SupabaseService());
 
-  final SupabaseService _supabaseService;
+  final LikesStore _store;
 
   Stream<LikeSnapshot> streamLikeSnapshot(String userId) {
-    return _supabaseService.client
-        .from('likes')
-        .stream(primaryKey: ['user_id', 'episode_id']).map((rows) {
+    return _store.streamLikeRows().map((rows) {
       final liked = <String>{};
       final counts = <String, int>{};
 
@@ -46,14 +47,57 @@ class LikesService {
     required bool currentlyLiked,
   }) async {
     if (currentlyLiked) {
-      await _supabaseService.client
-          .from('likes')
-          .delete()
-          .eq('user_id', userId)
-          .eq('episode_id', episodeId);
+      await _store.deleteLike(userId: userId, episodeId: episodeId);
       return;
     }
 
+    await _store.upsertLike(userId: userId, episodeId: episodeId);
+  }
+}
+
+abstract interface class LikesStore {
+  Stream<List<Map<String, dynamic>>> streamLikeRows();
+
+  Future<void> deleteLike({
+    required String userId,
+    required String episodeId,
+  });
+
+  Future<void> upsertLike({
+    required String userId,
+    required String episodeId,
+  });
+}
+
+class SupabaseLikesStore implements LikesStore {
+  const SupabaseLikesStore(this._supabaseService);
+
+  final SupabaseService _supabaseService;
+
+  @override
+  Stream<List<Map<String, dynamic>>> streamLikeRows() {
+    return _supabaseService.client
+        .from('likes')
+        .stream(primaryKey: ['user_id', 'episode_id']);
+  }
+
+  @override
+  Future<void> deleteLike({
+    required String userId,
+    required String episodeId,
+  }) async {
+    await _supabaseService.client
+        .from('likes')
+        .delete()
+        .eq('user_id', userId)
+        .eq('episode_id', episodeId);
+  }
+
+  @override
+  Future<void> upsertLike({
+    required String userId,
+    required String episodeId,
+  }) async {
     await _supabaseService.client.from('likes').upsert(
       {
         'user_id': userId,

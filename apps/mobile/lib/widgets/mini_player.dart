@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../screens/episode_detail_screen.dart';
 import '../state/playback_provider.dart';
 import '../theme/colors.dart';
+import 'play_pause_button.dart';
 
 class MiniPlayer extends StatelessWidget {
   const MiniPlayer({super.key});
@@ -99,17 +100,9 @@ class MiniPlayer extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          IconButton.filled(
-                            tooltip: playback.isPlaying ? 'Pause' : 'Play',
-                            style: IconButton.styleFrom(
-                              backgroundColor: AppColors.accent,
-                              foregroundColor: AppColors.background,
-                            ),
-                            icon: Icon(
-                              playback.isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                            ),
+                          PlayPauseButton(
+                            isPlaying: playback.isPlaying,
+                            isLoading: false,
                             onPressed: () {
                               if (playback.isPlaying) {
                                 playback.pause();

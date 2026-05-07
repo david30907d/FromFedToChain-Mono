@@ -34,6 +34,9 @@ class LikesProvider extends ChangeNotifier {
   final Map<String, EpisodeLikeState> _states = {};
   StreamSubscription<LikeSnapshot>? _subscription;
   String? _watchedUserId;
+  Object? _streamError;
+
+  Object? get streamError => _streamError;
 
   EpisodeLikeState stateFor(Episode episode) {
     return _states[episode.id] ??
@@ -56,6 +59,7 @@ class LikesProvider extends ChangeNotifier {
 
     _watchedUserId = userId;
     _subscription?.cancel();
+    _streamError = null;
     _subscription = _likesService.streamLikeSnapshot(userId).listen((snapshot) {
       final episodeIds = {
         ..._states.keys,
@@ -70,6 +74,10 @@ class LikesProvider extends ChangeNotifier {
         );
       }
 
+      _streamError = null;
+      notifyListeners();
+    }, onError: (Object error) {
+      _streamError = error;
       notifyListeners();
     });
   }

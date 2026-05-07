@@ -2,12 +2,8 @@ import OpenAI from 'openai';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
-import { readNullableString, readString } from '../lib/string.js';
-import type {
-  LanguageClassroomKeyword,
-  LanguageClassroomLesson,
-  LanguageClassroomLanguageCode,
-} from '../types.js';
+import { normalizeLanguageClassroomLesson } from '../lib/languageClassroom.js';
+import type { LanguageClassroomLesson, LanguageClassroomLanguageCode } from '../types.js';
 
 export interface ScriptResult {
   script: string;
@@ -223,7 +219,13 @@ function parseLanguageClassroomLessons(
   const payload = parseJsonObject(content);
   const rawLessons = Array.isArray(payload.lessons) ? payload.lessons : [];
   const lessons = rawLessons
-    .map((raw) => normalizeLanguageClassroomLesson(raw, sourceLanguageCode))
+    .map((raw) =>
+      normalizeLanguageClassroomLesson(raw, {
+        sourceLanguageCode,
+        requireKeywords: true,
+        maxKeywords: 5,
+      }),
+    )
     .filter((lesson): lesson is LanguageClassroomLesson => lesson !== null)
     .filter((lesson) =>
       targetLanguageCodes.includes(lesson.targetLanguageCode as LanguageClassroomLanguageCode),
@@ -252,44 +254,4 @@ function parseJsonObject(content: string): Record<string, unknown> {
   }
 
   return parsed as Record<string, unknown>;
-}
-
-function normalizeLanguageClassroomLesson(
-  raw: unknown,
-  sourceLanguageCode: string,
-): LanguageClassroomLesson | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const value = raw as Record<string, unknown>;
-  const targetLanguageCode = readString(value.targetLanguageCode ?? value.target_language_code);
-  const oneLiner = readString(value.oneLiner ?? value.one_liner);
-  const rawKeywords = Array.isArray(value.keywords) ? value.keywords : [];
-  const keywords = rawKeywords
-    .map(normalizeLanguageClassroomKeyword)
-    .filter((keyword): keyword is LanguageClassroomKeyword => keyword !== null)
-    .slice(0, 5);
-
-  if (!targetLanguageCode || !oneLiner || keywords.length === 0) return null;
-
-  return {
-    sourceLanguageCode,
-    targetLanguageCode,
-    oneLiner,
-    keywords,
-  };
-}
-
-function normalizeLanguageClassroomKeyword(raw: unknown): LanguageClassroomKeyword | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const value = raw as Record<string, unknown>;
-  const term = readString(value.term);
-  const meaning = readString(value.meaning);
-
-  if (!term || !meaning) return null;
-
-  return {
-    term,
-    reading: readNullableString(value.reading),
-    meaning,
-    note: readNullableString(value.note),
-  };
 }

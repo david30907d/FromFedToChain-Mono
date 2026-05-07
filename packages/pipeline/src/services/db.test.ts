@@ -7,10 +7,12 @@ import {
   findEpisodeLocalizationByEpisodeId,
   insertEpisode,
   insertEpisodeLocalization,
+  listEpisodes,
   listEpisodesPaged,
   listLanguageClassroomsByLocalizationIds,
   markEpisodeListened,
   toEpisodeResponse,
+  toLanguageClassroomLesson,
   updateEpisodeLocalizationArticleContent,
   updateEpisodeLocalizationStatus,
   upsertLanguageClassrooms,
@@ -115,6 +117,32 @@ describe('toEpisodeResponse', () => {
       ],
     });
   });
+
+  it('normalizes a camel-case classroom lesson input', () => {
+    expect(
+      toLanguageClassroomLesson({
+        sourceLanguageCode: 'zh-Hant',
+        targetLanguageCode: 'ja',
+        oneLiner: 'この記事は市場流動性を説明します。',
+        keywords: [
+          { term: ' 流動性 ', reading: ' ', meaning: ' 資金流動性 ', note: ' ' },
+          { term: '', reading: null, meaning: 'invalid', note: null },
+        ],
+      }),
+    ).toEqual({
+      sourceLanguageCode: 'zh-Hant',
+      targetLanguageCode: 'ja',
+      oneLiner: 'この記事は市場流動性を説明します。',
+      keywords: [
+        {
+          term: '流動性',
+          reading: null,
+          meaning: '資金流動性',
+          note: null,
+        },
+      ],
+    });
+  });
 });
 
 describe('episode source and localization lookup', () => {
@@ -135,6 +163,15 @@ describe('episode source and localization lookup', () => {
     expect(state.query!.eq).toHaveBeenCalledWith('source_url', 'https://example.com/article');
     expect(state.query!.eq).toHaveBeenCalledTimes(1);
     expect(result).toEqual(row);
+  });
+
+  it('throws Supabase errors when source lookup fails', async () => {
+    const error = new Error('lookup failed');
+    state.query!.maybeSingle.mockResolvedValue({ data: null, error });
+
+    await expect(findEpisodeBySourceUrl('https://example.com/article')).rejects.toThrow(
+      'lookup failed',
+    );
   });
 
   it('finds an episode localization by episode id and language', async () => {
@@ -182,6 +219,12 @@ describe('cursor helpers', () => {
 });
 
 describe('listEpisodesPaged', () => {
+  it('returns an empty list when the list view has no rows', async () => {
+    state.query!.returns.mockResolvedValue({ data: null, error: null });
+
+    await expect(listEpisodes()).resolves.toEqual([]);
+  });
+
   it('queries the localization view by language and returns next cursor', async () => {
     const rows = [listRow({ id: '00000000-0000-4000-8000-000000000001' })];
     state.query!.returns.mockResolvedValue({ data: [...rows, listRow()], error: null });
@@ -263,6 +306,19 @@ describe('insertEpisode and insertEpisodeLocalization', () => {
 });
 
 describe('language classrooms', () => {
+  it('does not query classrooms when no localization ids are provided', async () => {
+    const result = await listLanguageClassroomsByLocalizationIds([]);
+
+    expect(result).toEqual(new Map());
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('does not query classrooms when there are no lessons to upsert', async () => {
+    await expect(upsertLanguageClassrooms([])).resolves.toEqual([]);
+
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
   it('groups classrooms by episode localization id', async () => {
     const rows = [
       classroomRow({ episode_localization_id: 'loc-1', target_language_code: 'ja' }),
@@ -355,6 +411,28 @@ describe('updates', () => {
         r2_prefix: 'episodes/e/localizations/zh-Hant',
         tts_language_code: 'cmn-TW',
         tts_voice_name: 'cmn-TW-Wavenet-A',
+      }),
+    );
+  });
+
+  it('updates localized script metadata fields', async () => {
+    const row = localizationRow({ status: 'script_generated' });
+    state.query!.maybeSingle.mockResolvedValue({ data: row, error: null });
+
+    await updateEpisodeLocalizationStatus(row.id, 'script_generated', {
+      script: 'Generated script',
+      llmModel: 'model',
+      llmThinkingModel: 'thinking-model',
+      llmProvider: 'provider',
+    });
+
+    expect(state.query!.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'script_generated',
+        script: 'Generated script',
+        llm_model: 'model',
+        llm_thinking_model: 'thinking-model',
+        llm_provider: 'provider',
       }),
     );
   });

@@ -1,5 +1,9 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getRequiredEnv } from '../lib/env.js';
+import {
+  normalizeLanguageClassroomKeywords,
+  normalizeLanguageClassroomLesson,
+} from '../lib/languageClassroom.js';
 import type {
   Article,
   EpisodeListRow,
@@ -455,49 +459,6 @@ function normalizeLanguageClassroomRow(row: LanguageClassroomRow): LanguageClass
   };
 }
 
-function normalizeLanguageClassroomLesson(raw: unknown): LanguageClassroomLesson | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const value = raw as Record<string, unknown>;
-  const sourceLanguageCode = readString(value.sourceLanguageCode ?? value.source_language_code);
-  const targetLanguageCode = readString(value.targetLanguageCode ?? value.target_language_code);
-  const oneLiner = readString(value.oneLiner ?? value.one_liner);
-  const keywords = normalizeKeywords(value.keywords);
-
-  if (!sourceLanguageCode || !targetLanguageCode || !oneLiner) return null;
-
-  return {
-    sourceLanguageCode,
-    targetLanguageCode,
-    oneLiner,
-    keywords,
-  };
-}
-
 function normalizeKeywords(value: unknown): LanguageClassroomKeyword[] {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .map((raw) => {
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-      const keyword = raw as Record<string, unknown>;
-      const term = readString(keyword.term);
-      const meaning = readString(keyword.meaning);
-      if (!term || !meaning) return null;
-      return {
-        term,
-        reading: readNullableString(keyword.reading),
-        meaning,
-        note: readNullableString(keyword.note),
-      };
-    })
-    .filter((keyword): keyword is LanguageClassroomKeyword => keyword !== null);
-}
-
-function readString(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function readNullableString(value: unknown): string | null {
-  const text = readString(value);
-  return text || null;
+  return normalizeLanguageClassroomKeywords(value);
 }
