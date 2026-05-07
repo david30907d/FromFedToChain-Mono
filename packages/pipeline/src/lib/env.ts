@@ -19,6 +19,24 @@ export function getPort(): number {
   return port;
 }
 
+export function getTelegramBotToken(): string {
+  return getRequiredEnv('TELEGRAM_BOT_TOKEN');
+}
+
+export function getTelegramWebhookSecret(): string {
+  return getRequiredEnv('TELEGRAM_WEBHOOK_SECRET');
+}
+
+export function getAllowedTelegramUserIds(): Set<string> {
+  const raw = getRequiredEnv('TELEGRAM_ALLOWED_USER_IDS');
+  return new Set(
+    raw
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
+}
+
 export function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }

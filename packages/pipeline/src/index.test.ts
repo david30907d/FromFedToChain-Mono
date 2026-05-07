@@ -28,6 +28,7 @@ const {
   mockUpsertLanguageClassrooms,
   mockUploadHlsToR2,
   mockConvertArticleToZhTW,
+  mockTelegramFetch,
 } = vi.hoisted(() => ({
   mockDecodeCursor: vi.fn(),
   mockFindEpisodeBySourceUrl: vi.fn(),
@@ -49,6 +50,7 @@ const {
   mockUpsertLanguageClassrooms: vi.fn(),
   mockUploadHlsToR2: vi.fn(),
   mockConvertArticleToZhTW: vi.fn(),
+  mockTelegramFetch: vi.fn(),
 }));
 
 vi.mock('@hono/node-server', () => ({
@@ -357,6 +359,140 @@ describe('POST /ingest pipeline', () => {
   });
 });
 
+describe('POST /telegram/webhook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubEnv('TELEGRAM_WEBHOOK_SECRET', 'webhook-secret');
+    vi.stubEnv('TELEGRAM_ALLOWED_USER_IDS', '12345');
+    vi.stubEnv('TELEGRAM_BOT_TOKEN', 'bot-token');
+    vi.stubGlobal('fetch', mockTelegramFetch);
+    mockTelegramFetch.mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    mockFindEpisodeBySourceUrl.mockResolvedValue(episodeRow());
+    mockFindEpisodeLocalizationByEpisodeId.mockResolvedValue(localizationRow());
+    mockListLanguageClassroomsByLocalizationId.mockResolvedValue([]);
+    mockGenerateLanguageClassroomsWithLLM.mockResolvedValue({
+      lessons: [],
+      model: 'test-model',
+      thinkingModel: null,
+      provider: 'test-provider',
+    });
+    mockUpsertLanguageClassrooms.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['wrong', 'wrong-secret'],
+  ])('returns an empty 200 for %s webhook secret', async (_label, secret) => {
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+    };
+    if (secret) {
+      headers['x-telegram-bot-api-secret-token'] = secret;
+    }
+
+    const response = await app.request('/telegram/webhook', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(telegramUpdate({ text: 'https://example.com/article' })),
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('');
+    expect(mockFindEpisodeBySourceUrl).not.toHaveBeenCalled();
+    expect(mockTelegramFetch).not.toHaveBeenCalled();
+  });
+
+  it('ignores users outside the Telegram allowlist', async () => {
+    const response = await postTelegramUpdate(
+      telegramUpdate({ fromId: 99999, text: 'https://example.com/article' }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('');
+    expect(mockFindEpisodeBySourceUrl).not.toHaveBeenCalled();
+    expect(mockTelegramFetch).not.toHaveBeenCalled();
+  });
+
+  it('responds to /start without running ingest', async () => {
+    const response = await postTelegramUpdate(telegramUpdate({ text: '/start' }));
+
+    expect(response.status).toBe(200);
+    await vi.waitFor(() => expect(mockTelegramFetch).toHaveBeenCalledTimes(1));
+    expect(telegramMessageTexts()).toEqual([expect.stringContaining('貼一個文章 URL')]);
+    expect(mockFindEpisodeBySourceUrl).not.toHaveBeenCalled();
+  });
+
+  it('prompts when the message does not contain an http URL', async () => {
+    const response = await postTelegramUpdate(telegramUpdate({ text: 'hello' }));
+
+    expect(response.status).toBe(200);
+    await vi.waitFor(() => expect(mockTelegramFetch).toHaveBeenCalledTimes(1));
+    expect(telegramMessageTexts()).toEqual(['請貼一個 http(s) 文章網址']);
+    expect(mockFindEpisodeBySourceUrl).not.toHaveBeenCalled();
+  });
+
+  it('runs ingest for a valid URL and sends start plus result messages', async () => {
+    const response = await postTelegramUpdate(
+      telegramUpdate({ text: 'https://example.com/article' }),
+    );
+
+    expect(response.status).toBe(200);
+    await vi.waitFor(() => expect(mockTelegramFetch).toHaveBeenCalledTimes(2));
+    expect(mockFindEpisodeBySourceUrl).toHaveBeenCalledWith('https://example.com/article');
+    expect(telegramMessageTexts()).toEqual([
+      expect.stringContaining('收到'),
+      expect.stringContaining('https://cdn.example.com/playlist.m3u8'),
+    ]);
+  });
+
+  it('sends a short step-prefixed failure message when ingest fails', async () => {
+    mockFindEpisodeBySourceUrl.mockResolvedValue(null);
+    mockScrapeArticle.mockRejectedValue(new Error('timeout'));
+
+    const response = await postTelegramUpdate(
+      telegramUpdate({ text: 'https://example.com/fails' }),
+    );
+
+    expect(response.status).toBe(200);
+    await vi.waitFor(() => expect(mockTelegramFetch).toHaveBeenCalledTimes(2));
+    expect(telegramMessageTexts()).toEqual([
+      expect.stringContaining('收到'),
+      expect.stringContaining('❌ 失敗 [step:scrapeArticle] timeout'),
+    ]);
+  });
+
+  it('deduplicates repeated URLs while the first ingest is still running', async () => {
+    const localization = createDeferred<EpisodeLocalizationRow>();
+    mockFindEpisodeBySourceUrl.mockResolvedValue(episodeRow());
+    mockFindEpisodeLocalizationByEpisodeId.mockReturnValue(localization.promise);
+
+    const first = await postTelegramUpdate(telegramUpdate({ text: 'https://example.com/slow' }));
+    const second = await postTelegramUpdate(telegramUpdate({ text: 'https://example.com/slow' }));
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    await vi.waitFor(() => expect(mockTelegramFetch).toHaveBeenCalledTimes(2));
+    expect(mockFindEpisodeBySourceUrl).toHaveBeenCalledTimes(1);
+    expect(telegramMessageTexts()).toEqual([
+      expect.stringContaining('收到'),
+      expect.stringContaining('已在處理'),
+    ]);
+
+    localization.resolve(localizationRow());
+    await vi.waitFor(() => expect(mockTelegramFetch).toHaveBeenCalledTimes(3));
+  });
+});
+
 describe('GET /episodes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -573,4 +709,58 @@ function classroomRow(overrides: Partial<LanguageClassroomRow> = {}): LanguageCl
     updated_at: '2024-01-01T00:00:00.000Z',
     ...overrides,
   };
+}
+
+function telegramUpdate({
+  fromId = 12345,
+  chatId = 67890,
+  text,
+}: {
+  fromId?: number;
+  chatId?: number;
+  text: string;
+}) {
+  return {
+    update_id: 1,
+    message: {
+      message_id: 1,
+      from: { id: fromId, is_bot: false, first_name: 'Tester' },
+      chat: { id: chatId, type: 'private' },
+      date: 1,
+      text,
+    },
+  };
+}
+
+async function postTelegramUpdate(update: unknown): Promise<Response> {
+  return app.request('/telegram/webhook', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-telegram-bot-api-secret-token': 'webhook-secret',
+    },
+    body: JSON.stringify(update),
+  });
+}
+
+function telegramMessageTexts(): string[] {
+  return mockTelegramFetch.mock.calls.map(([, init]) => {
+    const body = JSON.parse(String((init as RequestInit).body)) as { text: string };
+    return body.text;
+  });
+}
+
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return { promise, resolve, reject };
 }

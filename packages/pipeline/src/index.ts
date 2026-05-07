@@ -8,7 +8,8 @@ import { timingSafeEqual } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
-import { getPort } from './lib/env.js';
+import { getAllowedTelegramUserIds, getPort, getTelegramWebhookSecret } from './lib/env.js';
+import { runIngestPipeline } from './pipeline/runIngest.js';
 import {
   DEFAULT_LIMIT,
   decodeCursor,
@@ -28,9 +29,21 @@ import {
   type LanguageClassroomLanguageCode,
   type LanguageClassroomRow,
 } from './types.js';
-import { performIngest } from './services/ingest.js';
+import {
+  extractUrlFromMessage,
+  isAllowedUser,
+  sendMessage,
+  verifySecret,
+  type TelegramChatId,
+} from './services/telegram.js';
 
 const app = new Hono();
+const inflightTelegramIngests = new Map<string, Promise<void>>();
+const TELEGRAM_HELP_TEXT =
+  '貼一個文章 URL，我會幫你產生新一集 podcast。\n支援任何 Mozilla Readability 能讀的網站（含 panews.io）。';
+const TELEGRAM_NO_URL_TEXT = '請貼一個 http(s) 文章網址';
+const TELEGRAM_INFLIGHT_TEXT = '這個 URL 已在處理中，完成後我會通知你。';
+const TELEGRAM_START_TEXT = '收到，開始處理文章。';
 
 app.use('*', cors());
 
@@ -51,8 +64,54 @@ app.post('/ingest', async (c) => {
     typeof body?.language === 'string' ? body.language : c.req.query('language'),
   );
 
-  const result = await performIngest(url, languageCode);
+  const result = await runIngestPipeline({ url, languageCode });
   return c.json(result.episode, result.statusCode);
+});
+
+app.post('/telegram/webhook', async (c) => {
+  const expectedSecret = getTelegramWebhookSecret();
+  const actualSecret = c.req.header('x-telegram-bot-api-secret-token');
+  if (!verifySecret(actualSecret, expectedSecret)) {
+    return emptyTelegramResponse(c);
+  }
+
+  const update = await c.req.json().catch(() => null);
+  const message = getTelegramMessage(update);
+  if (!message) {
+    return emptyTelegramResponse(c);
+  }
+
+  if (!isAllowedUser(message.from?.id, getAllowedTelegramUserIds())) {
+    return emptyTelegramResponse(c);
+  }
+
+  const chatId = message.chat?.id;
+  if (typeof chatId !== 'number' && typeof chatId !== 'string') {
+    return emptyTelegramResponse(c);
+  }
+
+  const text = typeof message.text === 'string' ? message.text.trim() : '';
+  if (isTelegramHelpCommand(text)) {
+    scheduleTelegramMessage(chatId, TELEGRAM_HELP_TEXT);
+    return emptyTelegramResponse(c);
+  }
+
+  const extractedUrl = extractUrlFromMessage(text);
+  if (!extractedUrl) {
+    scheduleTelegramMessage(chatId, TELEGRAM_NO_URL_TEXT);
+    return emptyTelegramResponse(c);
+  }
+
+  let url: string;
+  try {
+    url = parseInputUrl(extractedUrl);
+  } catch {
+    scheduleTelegramMessage(chatId, TELEGRAM_NO_URL_TEXT);
+    return emptyTelegramResponse(c);
+  }
+
+  enqueueTelegramIngest(chatId, url, DEFAULT_LANGUAGE_CODE);
+  return emptyTelegramResponse(c);
 });
 
 app.get('/episodes', async (c) => {
@@ -105,6 +164,121 @@ app.post('/episodes/:id/listened', async (c) => {
   const classrooms = await listLanguageClassroomsByLocalizationId(localization.id);
   return c.json(toEpisodeResponseFromLocalization(episode, localization, classrooms));
 });
+
+interface TelegramMessagePayload {
+  text?: unknown;
+  from?: {
+    id?: unknown;
+  };
+  chat?: {
+    id?: unknown;
+  };
+}
+
+function getTelegramMessage(update: unknown): TelegramMessagePayload | null {
+  if (!isRecord(update)) {
+    return null;
+  }
+
+  const message = update.message ?? update.edited_message;
+  if (!isRecord(message)) {
+    return null;
+  }
+
+  return {
+    text: message.text,
+    from: isRecord(message.from) ? { id: message.from.id } : undefined,
+    chat: isRecord(message.chat) ? { id: message.chat.id } : undefined,
+  };
+}
+
+function isTelegramHelpCommand(text: string): boolean {
+  const command = text.split(/\s+/, 1)[0]?.toLowerCase();
+  return (
+    command === '/start' ||
+    command === '/help' ||
+    command?.startsWith('/start@') === true ||
+    command?.startsWith('/help@') === true
+  );
+}
+
+function enqueueTelegramIngest(
+  chatId: TelegramChatId,
+  url: string,
+  languageCode: LanguageClassroomLanguageCode,
+): void {
+  if (inflightTelegramIngests.has(url)) {
+    scheduleTelegramMessage(chatId, TELEGRAM_INFLIGHT_TEXT);
+    return;
+  }
+
+  const job = new Promise<void>((resolve) => {
+    process.nextTick(() => {
+      void runTelegramIngest(chatId, url, languageCode).finally(resolve);
+    });
+  });
+
+  inflightTelegramIngests.set(url, job);
+  void job.finally(() => {
+    inflightTelegramIngests.delete(url);
+  });
+}
+
+async function runTelegramIngest(
+  chatId: TelegramChatId,
+  url: string,
+  languageCode: LanguageClassroomLanguageCode,
+): Promise<void> {
+  await sendTelegramNotification(chatId, TELEGRAM_START_TEXT);
+
+  try {
+    const result = await runIngestPipeline({ url, languageCode });
+    await sendTelegramNotification(chatId, formatTelegramIngestResult(result));
+  } catch (error) {
+    await sendTelegramNotification(chatId, `❌ 失敗 ${publicTelegramErrorMessage(error)}`);
+  }
+}
+
+function scheduleTelegramMessage(chatId: TelegramChatId, text: string): void {
+  process.nextTick(() => {
+    void sendTelegramNotification(chatId, text);
+  });
+}
+
+async function sendTelegramNotification(chatId: TelegramChatId, text: string): Promise<void> {
+  try {
+    await sendMessage(chatId, text);
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error('[/telegram/webhook] sendMessage failed:', {
+      message: err.message,
+    });
+  }
+}
+
+function formatTelegramIngestResult(result: Awaited<ReturnType<typeof runIngestPipeline>>): string {
+  const status = result.statusCode === 200 ? '✅ 已存在' : '✅ 完成';
+  const lines = [status, `《${result.episode.title}》`];
+  if (result.episode.hlsUrl) {
+    lines.push(result.episode.hlsUrl);
+  }
+
+  return lines.join('\n');
+}
+
+function publicTelegramErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const firstLine = message.split(/\r?\n/, 1)[0]?.trim() || 'Unknown error';
+  return firstLine.length > 500 ? `${firstLine.slice(0, 497)}...` : firstLine;
+}
+
+function emptyTelegramResponse(c: Context): Response {
+  return c.body(null, 200);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
 
 app.onError((error, c) => {
   if (error instanceof HTTPException) {
