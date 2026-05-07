@@ -1,3 +1,5 @@
+import '../utils/json_utils.dart' as json_utils;
+
 class AudioTrack {
   const AudioTrack({
     required this.languageCode,
@@ -252,10 +254,7 @@ int _readInt(
   String camelKey,
   String snakeKey,
 ) {
-  final value = json[camelKey] ?? json[snakeKey];
-  if (value is int) return value;
-  if (value is num) return value.toInt();
-  return int.tryParse(value?.toString() ?? '') ?? 0;
+  return json_utils.readIntFromJson(json, camelKey, snakeKey);
 }
 
 List<AudioTrack> _readAudioTracks(Map<String, dynamic> json) {

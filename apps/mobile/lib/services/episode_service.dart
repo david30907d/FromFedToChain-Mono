@@ -1,6 +1,7 @@
 import '../models/episode.dart';
 import '../models/episode_page.dart';
 import '../config/app_config.dart';
+import '../utils/json_utils.dart';
 import 'supabase_service.dart';
 
 class UserEpisodeState {
@@ -117,8 +118,5 @@ class EpisodeService {
 }
 
 int _readStateSeconds(Map<String, dynamic> row) {
-  final value = row['last_position_seconds'] ?? row['lastPositionSeconds'];
-  if (value is int) return value;
-  if (value is num) return value.toInt();
-  return int.tryParse(value?.toString() ?? '') ?? 0;
+  return readIntFromJson(row, 'lastPositionSeconds', 'last_position_seconds');
 }

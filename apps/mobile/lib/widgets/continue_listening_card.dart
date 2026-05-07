@@ -8,6 +8,7 @@ import '../utils/date_format.dart';
 import 'episode_hero_frame.dart';
 import 'like_button.dart';
 import 'share_button.dart';
+import 'played_button.dart';
 
 class ContinueListeningCard extends StatelessWidget {
   const ContinueListeningCard({
@@ -51,7 +52,7 @@ class ContinueListeningCard extends StatelessWidget {
                 : '從最舊未聽開始';
 
     return EpisodeHeroFrame(
-      constraints: const BoxConstraints(minHeight: 250),
+      height: 250,
       onTap: () {
         Navigator.push(
           context,
@@ -126,9 +127,11 @@ class ContinueListeningCard extends StatelessWidget {
               ),
               LikeButton(episode: episode),
               ShareButton(episode: episode),
-              _PlayedButton(
+              PlayedButton(
                 listened: episode.listened,
                 onPressed: onToggleListened,
+                labelPlayed: '已聽完',
+                labelMarkPlayed: '標記已聽',
               ),
             ],
           ),
@@ -142,34 +145,5 @@ class ContinueListeningCard extends StatelessWidget {
     final minutes = duration.inMinutes;
     final remainingSeconds = duration.inSeconds.remainder(60);
     return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
-  }
-}
-
-class _PlayedButton extends StatelessWidget {
-  const _PlayedButton({
-    required this.listened,
-    required this.onPressed,
-  });
-
-  final bool listened;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(
-        listened ? Icons.check_circle_rounded : Icons.check_circle_outline,
-        size: 19,
-        color: listened ? AppColors.success : AppColors.textSecondary,
-      ),
-      label: Text(listened ? '已聽完' : '標記已聽'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: listened ? AppColors.success : AppColors.textPrimary,
-        side: BorderSide(
-          color: listened ? AppColors.success : AppColors.divider,
-        ),
-      ),
-    );
   }
 }

@@ -136,10 +136,17 @@ class _FeedScreenState extends State<FeedScreen> {
     if (user == null || episodes.isEmpty) return episodes;
 
     _bindPlaybackUser(user.id);
-    final states = await _episodeService.getUserState(
-      user.id,
-      episodeIds: episodes.map((episode) => episode.id),
-    );
+    final Map<String, UserEpisodeState> states;
+    try {
+      states = await _episodeService.getUserState(
+        user.id,
+        episodeIds: episodes.map((episode) => episode.id),
+      );
+    } catch (error) {
+      debugPrint('Feed user state hydration failed: $error');
+      return episodes;
+    }
+
     return episodes.map(
       (episode) {
         final state = states[episode.id];
