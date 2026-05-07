@@ -18,18 +18,25 @@ class EpisodeCard extends StatelessWidget {
     required this.isPlaying,
     required this.isLoading,
     required this.onPlay,
-    required this.onToggleListened,
   });
 
   final Episode episode;
   final VoidCallback onPlay;
-  final VoidCallback onToggleListened;
   final bool isPlaying;
   final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final playEnabled = episode.status != EpisodeStatus.unplayed;
+    final playButton = PlayPauseButton(
+      isPlaying: isPlaying,
+      isLoading: isLoading,
+      onPressed: onPlay,
+      enabled: playEnabled,
+      tooltip: playEnabled ? null : '點開 episode 才能開始播放',
+      variant: PlayPauseButtonVariant.secondary,
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -49,12 +56,13 @@ class EpisodeCard extends StatelessWidget {
                   child: EpisodeStatusBadge(status: episode.status),
                 ),
                 const SizedBox(width: 10),
-                PlayPauseButton(
-                  isPlaying: isPlaying,
-                  isLoading: isLoading,
-                  onPressed: onPlay,
-                  variant: PlayPauseButtonVariant.secondary,
-                ),
+                playEnabled && !isLoading
+                    ? playButton
+                    : GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {},
+                        child: playButton,
+                      ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -113,7 +121,6 @@ class EpisodeCard extends StatelessWidget {
       MaterialPageRoute(
         builder: (_) => EpisodeDetailScreen(
           episode: episode,
-          onToggleListened: (_) => onToggleListened(),
         ),
       ),
     );
@@ -129,23 +136,6 @@ class EpisodeCard extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: Icon(
-                  episode.listened
-                      ? Icons.check_circle_rounded
-                      : Icons.check_circle_outline_rounded,
-                  color: episode.listened
-                      ? AppColors.success
-                      : AppColors.textSecondary,
-                ),
-                title: Text(
-                  episode.listened ? 'Played' : 'Mark as played',
-                ),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  onToggleListened();
-                },
-              ),
               ListTile(
                 leading: const Icon(
                   Icons.ios_share_rounded,

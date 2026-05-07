@@ -29,7 +29,6 @@ void main() {
         isPlaying: false,
         isLoading: false,
         onPlay: () {},
-        onToggleListened: () {},
       ),
     );
 
@@ -55,7 +54,6 @@ void main() {
         isPlaying: false,
         isLoading: false,
         onPlay: () {},
-        onToggleListened: () {},
       ),
     );
 
@@ -117,6 +115,39 @@ void main() {
 
     provider.dispose();
     await handler.dispose();
+  });
+
+  testWidgets('Episode detail play button is enabled for unplayed episodes',
+      (tester) async {
+    final handler = FakePodcastAudioHandler();
+    final provider = PlaybackProvider(handler);
+    final episode = _episode();
+
+    await _pumpHarness(
+      tester,
+      EpisodeDetailScreen(episode: episode),
+      playbackProvider: provider,
+    );
+
+    await tester.tap(find.byTooltip('Play'));
+    await tester.pumpAndSettle();
+
+    expect(handler.loadedEpisodeIds, ['episode-1']);
+    expect(handler.playCount, 1);
+
+    provider.dispose();
+    await handler.dispose();
+  });
+
+  testWidgets('Episode detail does not show manual listened action',
+      (tester) async {
+    await _pumpHarness(
+      tester,
+      EpisodeDetailScreen(episode: _episode()),
+    );
+
+    expect(find.text('Mark played'), findsNothing);
+    expect(find.text('Played'), findsNothing);
   });
 
   testWidgets('Episode detail hides language pill for fallback-only audio',

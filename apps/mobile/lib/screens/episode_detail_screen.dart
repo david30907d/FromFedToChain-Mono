@@ -1,37 +1,29 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../models/episode.dart';
-import '../state/auth_provider.dart';
 import '../state/playback_provider.dart';
 import '../theme/colors.dart';
 import '../widgets/episode_hero_frame.dart';
 import '../widgets/like_button.dart';
-import '../widgets/played_button.dart';
 import '../widgets/play_pause_button.dart';
 import '../widgets/playback_speed_menu.dart';
 import '../widgets/share_button.dart';
-
-typedef EpisodeToggleListened = FutureOr<void> Function(Episode episode);
 
 class EpisodeDetailScreen extends StatefulWidget {
   const EpisodeDetailScreen({
     super.key,
     required this.episode,
-    this.onToggleListened,
   });
 
   final Episode episode;
-  final EpisodeToggleListened? onToggleListened;
 
   @override
   State<EpisodeDetailScreen> createState() => _EpisodeDetailScreenState();
 }
 
 class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
-  late Episode _episode = widget.episode;
+  late final Episode _episode = widget.episode;
   final ScrollController _scrollController = ScrollController();
   bool _showAppBarBackground = false;
   bool _showBackToTop = false;
@@ -61,33 +53,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
         _showAppBarBackground = nextShowAppBarBackground;
         _showBackToTop = nextShowBackToTop;
       });
-    }
-  }
-
-  Future<void> _toggleListened() async {
-    final auth = context.read<AuthProvider>();
-    if (auth.currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sign in to mark episodes as played.')),
-      );
-      return;
-    }
-
-    final previous = _episode;
-    final next = previous.copyWith(listened: !previous.listened);
-    setState(() => _episode = next);
-
-    try {
-      final callback = widget.onToggleListened;
-      if (callback != null) {
-        await callback(previous);
-      }
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _episode = previous);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Played state failed: $error')),
-      );
     }
   }
 
@@ -145,7 +110,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                   const SizedBox(height: 14),
                   _ActionRow(
                     episode: _episode,
-                    onToggleListened: _toggleListened,
                   ),
                   const SizedBox(height: 28),
                   _LanguageClassroomSection(episode: _episode),
@@ -471,11 +435,9 @@ class _AudioTrackSegment extends StatelessWidget {
 class _ActionRow extends StatelessWidget {
   const _ActionRow({
     required this.episode,
-    required this.onToggleListened,
   });
 
   final Episode episode;
-  final VoidCallback onToggleListened;
 
   @override
   Widget build(BuildContext context) {
@@ -484,10 +446,6 @@ class _ActionRow extends StatelessWidget {
       children: [
         LikeButton(episode: episode),
         ShareButton(episode: episode),
-        PlayedButton(
-          listened: episode.listened,
-          onPressed: onToggleListened,
-        ),
       ],
     );
   }

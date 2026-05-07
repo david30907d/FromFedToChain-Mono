@@ -88,7 +88,7 @@ class PlaybackProvider extends ChangeNotifier {
     await _persistPosition(flush: true);
     _queue.clear();
     _queueIndex = -1;
-    await _setEpisode(episode);
+    await _setEpisode(episode, startAt: _resumePositionFor(episode));
     await _handler.play();
   }
 
@@ -103,10 +103,8 @@ class PlaybackProvider extends ChangeNotifier {
         .toList(growable: false);
 
     Episode? start;
-    Duration startAt = Duration.zero;
     if (inProgress.isNotEmpty) {
       start = inProgress.first;
-      startAt = Duration(seconds: start.lastPositionSeconds);
     } else if (unplayedOldestFirst.isNotEmpty) {
       start = unplayedOldestFirst.first;
     } else if (feed.isNotEmpty) {
@@ -127,10 +125,7 @@ class PlaybackProvider extends ChangeNotifier {
     }
     _queueIndex = 0;
 
-    await _setEpisode(start);
-    if (startAt > Duration.zero) {
-      await _handler.seek(startAt);
-    }
+    await _setEpisode(start, startAt: _resumePositionFor(start));
     await _handler.play();
   }
 
@@ -221,7 +216,14 @@ class PlaybackProvider extends ChangeNotifier {
     return tracks.first;
   }
 
-  Future<void> _setEpisode(Episode episode) async {
+  Duration _resumePositionFor(Episode episode) {
+    if (!episode.listened && episode.lastPositionSeconds > 5) {
+      return Duration(seconds: episode.lastPositionSeconds);
+    }
+    return Duration.zero;
+  }
+
+  Future<void> _setEpisode(Episode episode, {Duration? startAt}) async {
     final selectedTrack = _defaultAudioTrackFor(episode);
 
     _loadingEpisodeId = episode.id;
@@ -234,6 +236,12 @@ class PlaybackProvider extends ChangeNotifier {
 
     try {
       await _handler.setEpisode(episode, audioTrack: selectedTrack);
+      if (startAt != null && startAt > Duration.zero) {
+        _lastPersistedSecond = startAt.inSeconds;
+        await _handler.seek(startAt);
+        _position = startAt;
+        _lastPersistedSecond = startAt.inSeconds;
+      }
     } finally {
       _loadingEpisodeId = null;
       notifyListeners();
@@ -279,7 +287,8 @@ class PlaybackProvider extends ChangeNotifier {
     }
 
     _queueIndex = nextIndex;
-    await _setEpisode(_queue[_queueIndex]);
+    final nextEpisode = _queue[_queueIndex];
+    await _setEpisode(nextEpisode, startAt: _resumePositionFor(nextEpisode));
     await _handler.play();
   }
 

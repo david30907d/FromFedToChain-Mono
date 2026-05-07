@@ -50,6 +50,26 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
+  testWidgets('disables presses when enabled is false', (tester) async {
+    var taps = 0;
+
+    await _pumpButton(
+      tester,
+      PlayPauseButton(
+        isPlaying: false,
+        isLoading: false,
+        enabled: false,
+        onPressed: () => taps += 1,
+      ),
+    );
+
+    await tester.tap(find.byType(IconButton), warnIfMissed: false);
+    await tester.pump();
+
+    expect(taps, 0);
+    expect(find.byIcon(Icons.play_arrow_rounded), findsOneWidget);
+  });
+
   testWidgets('can render a labeled primary action', (tester) async {
     await _pumpButton(
       tester,

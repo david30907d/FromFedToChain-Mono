@@ -1,6 +1,7 @@
 import 'package:ai_podcast_mobile/config/app_config.dart';
 import 'package:ai_podcast_mobile/models/episode.dart';
 import 'package:ai_podcast_mobile/models/episode_page.dart';
+import 'package:ai_podcast_mobile/screens/episode_detail_screen.dart';
 import 'package:ai_podcast_mobile/screens/feed_screen.dart';
 import 'package:ai_podcast_mobile/services/auth_service.dart';
 import 'package:ai_podcast_mobile/services/episode_service.dart';
@@ -9,6 +10,7 @@ import 'package:ai_podcast_mobile/state/auth_provider.dart';
 import 'package:ai_podcast_mobile/state/likes_provider.dart';
 import 'package:ai_podcast_mobile/state/playback_provider.dart';
 import 'package:ai_podcast_mobile/theme/app_theme.dart';
+import 'package:ai_podcast_mobile/widgets/episode_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -53,25 +55,93 @@ void main() {
     expect(find.text('未聽'), findsOneWidget);
     expect(find.textContaining('permission denied'), findsNothing);
   });
+
+  testWidgets('unplayed episode list play button is disabled', (tester) async {
+    final handler = FakePodcastAudioHandler();
+    final service = _FeedEpisodeService();
+
+    await _pumpFeed(tester, service, audioHandler: handler);
+
+    final disabledPlayButton = find.descendant(
+      of: find.byType(EpisodeCard),
+      matching: find.byTooltip('點開 episode 才能開始播放'),
+    );
+    expect(disabledPlayButton, findsOneWidget);
+
+    await tester.tap(disabledPlayButton, warnIfMissed: false);
+    await tester.pump();
+
+    expect(handler.loadedEpisodeIds, isEmpty);
+    expect(handler.playCount, 0);
+    expect(find.byType(EpisodeDetailScreen), findsNothing);
+
+    await tester.pump(const Duration(seconds: 2));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(EpisodeCard),
+        matching: find.text('Treasury liquidity watch'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(EpisodeDetailScreen), findsOneWidget);
+
+    await handler.dispose();
+  });
+
+  testWidgets('in-progress episode list play resumes stored position',
+      (tester) async {
+    final handler = FakePodcastAudioHandler();
+    final service = _FeedEpisodeService(
+      states: const {
+        'episode-1': UserEpisodeState(
+          listened: false,
+          lastPositionSeconds: 42,
+        ),
+      },
+    );
+
+    await _pumpFeed(tester, service, audioHandler: handler);
+
+    final playButton = find.descendant(
+      of: find.byType(EpisodeCard),
+      matching: find.byTooltip('Play'),
+    );
+    expect(playButton, findsOneWidget);
+
+    await tester.tap(playButton);
+    await tester.pumpAndSettle();
+
+    expect(handler.loadedEpisodeIds, ['episode-1']);
+    expect(handler.seekPositions, [const Duration(seconds: 42)]);
+    expect(handler.playCount, 1);
+
+    await handler.dispose();
+  });
 }
 
 Future<void> _pumpFeed(
   WidgetTester tester,
-  _FeedEpisodeService episodeService,
-) async {
+  _FeedEpisodeService episodeService, {
+  FakePodcastAudioHandler? audioHandler,
+}) async {
   final authProvider = AuthProvider(
     authService: _FakeAuthService(
       const PodcastUser(id: 'user-1', displayName: 'Test User'),
     ),
   );
   await authProvider.restore();
+  final handler = audioHandler ?? FakePodcastAudioHandler();
 
   await tester.pumpWidget(
     MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         ChangeNotifierProvider(
-          create: (_) => PlaybackProvider(FakePodcastAudioHandler()),
+          create: (_) => PlaybackProvider(
+            handler,
+            episodeService: episodeService,
+          ),
         ),
         ChangeNotifierProvider(
           create: (_) => LikesProvider(likesService: _EmptyLikesService()),
