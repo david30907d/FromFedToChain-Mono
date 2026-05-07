@@ -7,7 +7,6 @@ import '../theme/colors.dart';
 import '../utils/date_format.dart';
 import 'episode_hero_frame.dart';
 import 'like_button.dart';
-import 'played_button.dart';
 import 'play_pause_button.dart';
 import 'share_button.dart';
 
@@ -19,7 +18,6 @@ class ContinueListeningCard extends StatelessWidget {
     required this.isPlaying,
     required this.isLoading,
     required this.onPlay,
-    required this.onToggleListened,
   });
 
   final Episode episode;
@@ -27,7 +25,6 @@ class ContinueListeningCard extends StatelessWidget {
   final bool isPlaying;
   final bool isLoading;
   final VoidCallback onPlay;
-  final VoidCallback onToggleListened;
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +57,6 @@ class ContinueListeningCard extends StatelessWidget {
           MaterialPageRoute(
             builder: (_) => EpisodeDetailScreen(
               episode: episode,
-              onToggleListened: (_) => onToggleListened(),
             ),
           ),
         );
@@ -120,12 +116,6 @@ class ContinueListeningCard extends StatelessWidget {
               ),
               LikeButton(episode: episode),
               ShareButton(episode: episode),
-              PlayedButton(
-                listened: episode.listened,
-                onPressed: onToggleListened,
-                labelPlayed: '已聽完',
-                labelMarkPlayed: '標記已聽',
-              ),
             ],
           ),
         ],

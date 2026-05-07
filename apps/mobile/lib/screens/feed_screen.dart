@@ -173,55 +173,6 @@ class _FeedScreenState extends State<FeedScreen> {
     }
   }
 
-  Future<void> _toggleListened(Episode episode) async {
-    final user = context.read<AuthProvider>().currentUser;
-    if (user == null) return;
-
-    final nextValue = !episode.listened;
-    setState(() {
-      _episodes = _episodes
-          .map(
-            (item) => item.id == episode.id
-                ? item.copyWith(
-                    listened: nextValue,
-                    lastPositionSeconds:
-                        nextValue ? item.lastPositionSeconds : 0,
-                  )
-                : item,
-          )
-          .toList(growable: false);
-    });
-
-    try {
-      await _episodeService.setListened(
-        userId: user.id,
-        episodeId: episode.id,
-        listened: nextValue,
-      );
-      if (!nextValue) {
-        await _episodeService.setPosition(
-          userId: user.id,
-          episodeId: episode.id,
-          seconds: 0,
-        );
-      }
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _episodes = _episodes
-            .map(
-              (item) => item.id == episode.id
-                  ? item.copyWith(listened: episode.listened)
-                  : item,
-            )
-            .toList(growable: false);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Played state failed: $error')),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().currentUser;
@@ -282,7 +233,6 @@ class _FeedScreenState extends State<FeedScreen> {
                   isPlaying: playback.isEpisodePlaying(heroEpisode.id),
                   isLoading: playback.loadingEpisodeId == heroEpisode.id,
                   onPlay: () => _handleSmartPlay(heroEpisode),
-                  onToggleListened: () => _toggleListened(heroEpisode),
                 ),
               ),
             if (groups.inProgress.isNotEmpty) ...[
@@ -293,7 +243,6 @@ class _FeedScreenState extends State<FeedScreen> {
                 episodes: groups.inProgress,
                 playback: playback,
                 onPlay: (episode) => playback.toggle(episode),
-                onToggleListened: _toggleListened,
               ),
             ],
             if (groups.unplayed.isNotEmpty) ...[
@@ -304,7 +253,6 @@ class _FeedScreenState extends State<FeedScreen> {
                 episodes: groups.unplayed,
                 playback: playback,
                 onPlay: (episode) => playback.toggle(episode),
-                onToggleListened: _toggleListened,
               ),
             ],
             if (groups.completed.isNotEmpty) ...[
@@ -322,7 +270,6 @@ class _FeedScreenState extends State<FeedScreen> {
                   episodes: groups.completed,
                   playback: playback,
                   onPlay: (episode) => playback.toggle(episode),
-                  onToggleListened: _toggleListened,
                 ),
             ],
             SliverToBoxAdapter(
@@ -413,13 +360,11 @@ class _EpisodeSliverList extends StatelessWidget {
     required this.episodes,
     required this.playback,
     required this.onPlay,
-    required this.onToggleListened,
   });
 
   final List<Episode> episodes;
   final PlaybackProvider playback;
   final ValueChanged<Episode> onPlay;
-  final ValueChanged<Episode> onToggleListened;
 
   @override
   Widget build(BuildContext context) {
@@ -432,7 +377,6 @@ class _EpisodeSliverList extends StatelessWidget {
           isPlaying: playback.isEpisodePlaying(episode.id),
           isLoading: playback.loadingEpisodeId == episode.id,
           onPlay: () => onPlay(episode),
-          onToggleListened: () => onToggleListened(episode),
         );
       },
     );

@@ -39,6 +39,8 @@ PORT=3010 pnpm --filter @from-fed-to-chain-mono/pipeline dev
 ```
 
 The pipeline API defaults to `http://localhost:3000`.
+Telegram bot setup for the pipeline lives in
+[packages/pipeline/README.md](packages/pipeline/README.md).
 
 Mobile:
 
@@ -90,7 +92,10 @@ fly secrets set \
   OPENROUTER_API_KEY=... \
   OPENROUTER_BASE_URL=https://openrouter.ai/api/v1 \
   LLM_MODEL=anthropic/claude-3-5-sonnet-20241022 \
-  INGEST_ADMIN_TOKEN=...
+  INGEST_ADMIN_TOKEN=... \
+  TELEGRAM_BOT_TOKEN=... \
+  TELEGRAM_WEBHOOK_SECRET=... \
+  TELEGRAM_ALLOWED_USER_IDS=...
 fly deploy
 ```
 

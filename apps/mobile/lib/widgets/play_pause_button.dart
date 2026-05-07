@@ -13,6 +13,7 @@ class PlayPauseButton extends StatelessWidget {
     required this.isPlaying,
     required this.isLoading,
     required this.onPressed,
+    this.enabled = true,
     this.label,
     this.variant = PlayPauseButtonVariant.primary,
     this.fixedSize,
@@ -23,6 +24,7 @@ class PlayPauseButton extends StatelessWidget {
 
   final bool isPlaying;
   final bool isLoading;
+  final bool enabled;
   final VoidCallback onPressed;
   final String? label;
   final PlayPauseButtonVariant variant;
@@ -34,10 +36,11 @@ class PlayPauseButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final effectiveTooltip = tooltip ?? (isPlaying ? 'Pause' : 'Play');
+    final effectiveOnPressed = enabled && !isLoading ? onPressed : null;
 
     if (label != null) {
       return FilledButton.icon(
-        onPressed: isLoading ? null : onPressed,
+        onPressed: effectiveOnPressed,
         icon: _iconContent(AppColors.background),
         label: Text(label!),
       );
@@ -51,7 +54,7 @@ class PlayPauseButton extends StatelessWidget {
         backgroundColor: colors.background,
         foregroundColor: colors.foreground,
       ),
-      onPressed: isLoading ? null : onPressed,
+      onPressed: effectiveOnPressed,
       icon: _iconContent(colors.foreground),
     );
   }

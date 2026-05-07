@@ -29,6 +29,23 @@ void main() {
     await handler.dispose();
   });
 
+  test('toggle resumes in-progress episodes from their last position',
+      () async {
+    final handler = FakePodcastAudioHandler();
+    final provider = PlaybackProvider(handler);
+    final episode = _episode('episode-1').copyWith(lastPositionSeconds: 42);
+
+    await provider.toggle(episode);
+
+    expect(handler.loadedEpisodeIds, ['episode-1']);
+    expect(handler.seekPositions, [const Duration(seconds: 42)]);
+    expect(provider.position, const Duration(seconds: 42));
+    expect(handler.playCount, 1);
+
+    provider.dispose();
+    await handler.dispose();
+  });
+
   test('toggle pauses and resumes the current episode without reloading it',
       () async {
     final handler = FakePodcastAudioHandler();
@@ -178,6 +195,7 @@ void main() {
     expect(handler.seekPositions, [const Duration(seconds: 42)]);
     expect(handler.playCount, 1);
     expect(provider.currentEpisode?.id, 'episode-2');
+    expect(provider.position, const Duration(seconds: 42));
 
     handler.complete();
     await Future<void>.delayed(Duration.zero);
